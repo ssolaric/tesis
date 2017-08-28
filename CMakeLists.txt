@@ -3,4 +3,10 @@ project(tesis)
 
 set(CMAKE_CXX_STANDARD 11)
 
-file(COPY ./ImagenesRenombradas DESTINATION .)
+file(COPY ./Imagenes DESTINATION .)
+
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+add_executable(tesis tesis.cpp)
+target_link_libraries(tesis ${OpenCV_LIBS})
