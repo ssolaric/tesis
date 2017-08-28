@@ -31,6 +31,31 @@ void floodFillPostprocess( Mat& img, const Scalar& colorDiff=Scalar::all(1) )
     }
 }
 
+// https://stackoverflow.com/a/15009815
+
+Mat equalizeIntensity(const Mat& inputImage)
+{
+    if(inputImage.channels() >= 3)
+    {
+        Mat ycrcb;
+
+        cvtColor(inputImage,ycrcb,CV_BGR2YCrCb);
+
+        std::vector<Mat> channels;
+        split(ycrcb,channels);
+
+        equalizeHist(channels[0], channels[0]);
+
+        Mat result;
+        merge(channels,ycrcb);
+
+        cvtColor(ycrcb,result,CV_YCrCb2BGR);
+
+        return result;
+    }
+    return Mat();
+}
+
 
 cv::Mat quitar_margen(const cv::Mat& imagen, int margen) {
     cv::Mat nueva(imagen.rows - 2*margen, imagen.cols - 2*margen, imagen.type());
@@ -71,30 +96,40 @@ int main() {
         // 1. Aplicar Mean Shift a la imagen a color.
 
         cv::Mat imagen = quitar_margen(imagenes[i], 4);
-
+        imagen = equalizeIntensity(imagen);
         double spatialWindowRadius = 2; // sp
         double colorWindowRadius = 5; // sr
         cv::pyrMeanShiftFiltering(imagen, imagen, spatialWindowRadius, colorWindowRadius);
-        floodFillPostprocess(imagen, Scalar::all(2));
+        //floodFillPostprocess(imagen, Scalar::all(2));
         // 2. Aplicar Median Blur a la imagen en escala de grises.
-        //cv::cvtColor(imagen, imagen, cv::COLOR_BGR2GRAY);
-        // for (int j = 1; j < 5; j += 2) {
-        //     cv::medianBlur(imagen, imagen, j);
-        // }
-
+        cv::cvtColor(imagen, imagen, cv::COLOR_BGR2GRAY);
+        for (int j = 1; j < 11; j += 2) {
+            cv::medianBlur(imagen, imagen, j);
+            // cv::GaussianBlur(imagen, imagen, Size(j, j), 0);
+        }
+        
         // 3. Hacer un resize
+        // ¿Conviene o no conviene?
+        // Conviene: si el resize es bueno, permite mayor detalle para la reconstrucción.
+        // No conviene: ya no cogería la forma original del espermatozoide.
         // cv::resize(imagen, imagen, cv::Size(0, 0), 8.0, 8.0, cv::INTER_CUBIC);
 
         // 4. Aumentar el contraste
-        //cv::equalizeHist(imagen, imagen);
-
+        cv::equalizeHist(imagen, imagen);
         // 5. Hacer el threshold
-        // cv::inRange(imagen, cv::Scalar(0), cv::Scalar(10), imagen);
 
-        cv::namedWindow(nombresImagenes[i], cv::WINDOW_AUTOSIZE);
-        cv::imshow(nombresImagenes[i], imagen);
-        cv::waitKey(2000);
-        // cv::waitKey(5000);
+        // El área oscura dentro de un espermatozoide (los píxeles entre 0 y 2) es la parte inferior de la cabeza (cercana a la cola).
+
+        cv::inRange(imagen, cv::Scalar(3), cv::Scalar(25), imagen);
+        // cv::adaptiveThreshold(imagen, imagen, 255, ADAPTIVE_THRESH_MEAN_C,  THRESH_BINARY_INV, 3, 3);
+        // cv::threshold(imagen, imagen, 40, 255, THRESH_BINARY);
+        std::string ruta = std::string("./ImagenesProcesadas/") + nombresImagenes[i];
+        cv::imwrite(ruta, imagen);
+
+        // cv::namedWindow(nombresImagenes[i], cv::WINDOW_AUTOSIZE);
+        // cv::imshow(nombresImagenes[i], imagen);
+        // cv::waitKey(2000);
+        // // cv::waitKey(5000);
     }
 }
 
