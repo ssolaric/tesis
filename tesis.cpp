@@ -67,7 +67,7 @@ void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<cv::M
     }
 }
 
-void procesar_imagen(cv::Mat& imagen, const std::string& nombre_imagen) {
+void binarizacion(cv::Mat& imagen, const std::string& nombre_imagen) {
 
     imagen = equalizeIntensity(imagen); // ecualización del canal de intensidad 
     double spatialWindowRadius = 2; // sp
@@ -92,8 +92,20 @@ void procesar_imagen(cv::Mat& imagen, const std::string& nombre_imagen) {
     // El área oscura dentro de un espermatozoide (los píxeles entre 0 y 2) es la parte inferior de la cabeza (cercana a la cola).
     // No funciona bien con la imagen 14 (posible opción: descartarla)
     cv::inRange(imagen, cv::Scalar(3), cv::Scalar(25), imagen);
-    std::string ruta = std::string("./ImagenesProcesadas/") + nombre_imagen;
+    std::string ruta = std::string("./ImagenesBinarizadas/") + nombre_imagen;
     cv::imwrite(ruta, imagen);
+}
+
+void deteccion(cv::Mat& imagen, const std::string& nombre_imagen) {
+    // SimpleBlobDetector::Params params;
+    // cv::Ptr<SimpleBlobDetector> detector = SimpleBlobDetector::create();
+
+    SimpleBlobDetector detector;
+    std::vector<KeyPoint> keypoints;
+    detector.detect(imagen, keypoints);
+    std::string ruta = std::string("./Blobs/") + nombre_imagen;
+    cv::imwrite(ruta, imagen);
+
 }
 
 int main() {
@@ -102,7 +114,8 @@ int main() {
     leer_imagenes(nombresImagenes, imagenes);
     for (size_t i = 0; i < imagenes.size(); i++) {
         cv::Mat imagen = quitar_margen(imagenes[i], 4);
-        procesar_imagen(imagen, nombresImagenes[i]);
+        binarizacion(imagen, nombresImagenes[i]);
+        deteccion(imagen, nombresImagenes[i]);
     }
 }
 

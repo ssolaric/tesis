@@ -8,5 +8,5 @@ file(COPY ./Imagenes DESTINATION .)
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-add_executable(tesis tesis.cpp)
-target_link_libraries(tesis ${OpenCV_LIBS})
+add_executable(tesis.out tesis.cpp)
+target_link_libraries(tesis.out ${OpenCV_LIBS})
