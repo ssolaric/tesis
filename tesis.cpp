@@ -115,7 +115,7 @@ int main() {
     for (size_t i = 0; i < imagenes.size(); i++) {
         cv::Mat imagen = quitar_margen(imagenes[i], 4);
         binarizacion(imagen, nombresImagenes[i]);
-        deteccion(imagen, nombresImagenes[i]);
+        // deteccion(imagen, nombresImagenes[i]);
     }
 }
 
