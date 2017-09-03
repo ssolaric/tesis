@@ -11,28 +11,8 @@
 #include <opencv2/opencv.hpp>
 using namespace cv;
 
-// https://github.com/opencv/opencv_attic/blob/master/opencv/samples/cpp/meanshift_segmentation.cpp
-void floodFillPostprocess( Mat& img, const Scalar& colorDiff=Scalar::all(1) )
-{
-    CV_Assert( !img.empty() );
-    RNG rng = theRNG();
-    Mat mask( img.rows+2, img.cols+2, CV_8UC1, Scalar::all(0) );
-    for( int y = 0; y < img.rows; y++ )
-    {
-        for( int x = 0; x < img.cols; x++ )
-        {
-            if( mask.at<uchar>(y+1, x+1) == 0 )
-            {
-                Scalar newVal( rng(256), rng(256), rng(256) );
-                floodFill( img, mask, Point(x,y), newVal, 0, colorDiff, colorDiff );
-            }
-        }
-    }
-}
-
 // https://stackoverflow.com/a/15009815
-Mat equalizeIntensity(const Mat& inputImage)
-{
+Mat equalizeIntensity(const Mat& inputImage) {
     if(inputImage.channels() >= 3)
     {
         Mat ycrcb;
@@ -65,7 +45,7 @@ cv::Mat quitar_margen(const cv::Mat& imagen, int margen) {
     return nueva;
 }
 
-void leer_imagenes(std::vector<std::string>& nombresImagenes, std::vector<cv::Mat>& imagenes) {
+void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<cv::Mat>& imagenes) {
     struct dirent** namelist;
     int n = scandir("./Imagenes", &namelist, NULL, versionsort);
     if (n < 0) {
@@ -79,7 +59,7 @@ void leer_imagenes(std::vector<std::string>& nombresImagenes, std::vector<cv::Ma
                 cv::Mat imagen = cv::imread(ruta);
                 if (imagen.empty()) continue;
                 imagenes.push_back(imagen);
-                nombresImagenes.push_back(nombre);
+                nombres_imagenes.push_back(nombre);
             }
             free(namelist[i]);
         }
@@ -87,11 +67,12 @@ void leer_imagenes(std::vector<std::string>& nombresImagenes, std::vector<cv::Ma
     }
 }
 
-void procesar_imagen(cv::Mat& imagen, const std::string& nombreImagen) {
+void procesar_imagen(cv::Mat& imagen, const std::string& nombre_imagen) {
 
     imagen = equalizeIntensity(imagen); // ecualización del canal de intensidad 
     double spatialWindowRadius = 2; // sp
     double colorWindowRadius = 5; // sr
+
     // 1. Aplicar Mean Shift a la imagen a color.
     cv::pyrMeanShiftFiltering(imagen, imagen, spatialWindowRadius, colorWindowRadius);
 
@@ -111,7 +92,7 @@ void procesar_imagen(cv::Mat& imagen, const std::string& nombreImagen) {
     // El área oscura dentro de un espermatozoide (los píxeles entre 0 y 2) es la parte inferior de la cabeza (cercana a la cola).
     // No funciona bien con la imagen 14 (posible opción: descartarla)
     cv::inRange(imagen, cv::Scalar(3), cv::Scalar(25), imagen);
-    std::string ruta = std::string("./ImagenesProcesadas/") + nombreImagen;
+    std::string ruta = std::string("./ImagenesProcesadas/") + nombre_imagen;
     cv::imwrite(ruta, imagen);
 }
 
