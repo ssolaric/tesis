@@ -10,6 +10,7 @@
 #include <opencv2/opencv.hpp>
 using namespace cv;
 
+
 // https://stackoverflow.com/a/15009815
 Mat equalizeIntensity(const Mat& inputImage) {
     if(inputImage.channels() >= 3)
@@ -221,13 +222,89 @@ bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
 //     imwrite(contorno);
 // }
 
+void drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale = 0.2)
+{
+    double angle;
+    double hypotenuse;
+    angle = atan2( (double) p.y - q.y, (double) p.x - q.x ); // angle in radians
+    hypotenuse = sqrt( (double) (p.y - q.y) * (p.y - q.y) + (p.x - q.x) * (p.x - q.x));
+//    double degrees = angle * 180 / CV_PI; // convert radians to degrees (0-180 range)
+//    cout << "Degrees: " << abs(degrees - 180) << endl; // angle in 0-360 degrees range
+    // Here we lengthen the arrow by a factor of scale
+    q.x = (int) (p.x - scale * hypotenuse * cos(angle));
+    q.y = (int) (p.y - scale * hypotenuse * sin(angle));
+    line(img, p, q, colour, 1, CV_AA);
+    // create the arrow hooks
+    p.x = (int) (q.x + 9 * cos(angle + CV_PI / 4));
+    p.y = (int) (q.y + 9 * sin(angle + CV_PI / 4));
+    line(img, p, q, colour, 1, CV_AA);
+    p.x = (int) (q.x + 9 * cos(angle - CV_PI / 4));
+    p.y = (int) (q.y + 9 * sin(angle - CV_PI / 4));
+    line(img, p, q, colour, 1, CV_AA);
+}
+double getOrientation(const std::vector<Point> &pts, Mat &img)
+{
+    //Construct a buffer used by the pca analysis
+    int sz = static_cast<int>(pts.size());
+    Mat data_pts = Mat(sz, 2, CV_64FC1);
+    for (int i = 0; i < data_pts.rows; ++i)
+    {
+        data_pts.at<double>(i, 0) = pts[i].x;
+        data_pts.at<double>(i, 1) = pts[i].y;
+    }
+    //Perform PCA analysis
+    PCA pca_analysis(data_pts, Mat(), CV_PCA_DATA_AS_ROW);
+    //Store the center of the object
+    Point cntr = Point(static_cast<int>(pca_analysis.mean.at<double>(0, 0)),
+                      static_cast<int>(pca_analysis.mean.at<double>(0, 1)));
+    //Store the eigenvalues and eigenvectors
+    std::vector<Point2d> eigen_vecs(2);
+    std::vector<double> eigen_val(2);
+    for (int i = 0; i < 2; ++i)
+    {
+        eigen_vecs[i] = Point2d(pca_analysis.eigenvectors.at<double>(i, 0),
+                                pca_analysis.eigenvectors.at<double>(i, 1));
+        eigen_val[i] = pca_analysis.eigenvalues.at<double>(0, i);
+    }
+    // Draw the principal components
+    circle(img, cntr, 3, Scalar(255, 0, 255), 2);
+    Point p1 = cntr + 0.02 * Point(static_cast<int>(eigen_vecs[0].x * eigen_val[0]), static_cast<int>(eigen_vecs[0].y * eigen_val[0]));
+    Point p2 = cntr - 0.02 * Point(static_cast<int>(eigen_vecs[1].x * eigen_val[1]), static_cast<int>(eigen_vecs[1].y * eigen_val[1]));
+    drawAxis(img, cntr, p1, Scalar(0, 255, 0), 1);
+    drawAxis(img, cntr, p2, Scalar(255, 255, 0), 5);
+    double angle = atan2(eigen_vecs[0].y, eigen_vecs[0].x); // orientation in radians
+    return angle;
+}
+
+void rotar_imagen(Mat& imagen, double angulo) {
+    Point2f centro(imagen.cols/2.0, imagen.rows/2.0);
+    Mat rotacion = getRotationMatrix2D(centro, angulo, 1.0); // este ángulo es en grados
+
+    Rect bbox = RotatedRect(centro, imagen.size(), angulo).boundingRect();
+
+    rotacion.at<double>(0, 2) += bbox.width/2.0 - centro.x;
+    rotacion.at<double>(1, 2) += bbox.height/2.0 - centro.y;
+
+    warpAffine(imagen, imagen, rotacion, bbox.size());
+}
+
 void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std::vector<Point>& contorno) {
     Rect rectangulo = boundingRect(contorno);
-
-    // drawContours(imagen, contours, contorno_cabeza, Scalar(255), -1);
     rectangle(imagen, rectangulo, Scalar(255));
 
+    // https://stackoverflow.com/a/8110695
+    Mat roi = Mat(imagen, rectangulo).clone();
+    
+    // double angulo = getOrientation(contorno, roi);
+    double angulo = getOrientation(contorno, imagen); // en radianes
+    // angulo = std::min(angulo, CV_PI -angulo);
+    debug(angulo*180.0/CV_PI);
+    
+    // rotar_imagen(roi, -angulo);
+    rotar_imagen(imagen, angulo*180.0/CV_PI); // ángulo en grados
+
     std::string ruta = std::string("./Normalizadas/") + nombre_imagen;
+    // imwrite(ruta, roi);
     imwrite(ruta, imagen);
 }
 
