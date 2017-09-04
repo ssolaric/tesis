@@ -70,26 +70,6 @@ void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<Mat>&
     }
 }
 
-// https://stackoverflow.com/a/8467129
-void contorno(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours) {
-    // Mat contourOutput = imagen.clone();
-    findContours(imagen, contours, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
-
-    //Draw the contours
-    Mat contourImage(imagen.size(), CV_8UC3, Scalar(0,0,0));
-    Scalar colors[3];
-    colors[0] = Scalar(255, 0, 0);
-    colors[1] = Scalar(0, 255, 0);
-    colors[2] = Scalar(0, 0, 255);
-    // for (size_t i = 0; i < contours.size(); i++) {
-    //     drawContours(contourImage, contours, i, colors[idx % 3]); // dibuja en contourImage el contorno contours[i]
-    // }
-    drawContours(contourImage, contours, -1, colors[1]);
-
-    std::string ruta = std::string("./Contornos/") + nombre_imagen;
-    imwrite(ruta, contourImage);
-}
-
 void binarizacion(Mat& imagen, const std::string& nombre_imagen) {
 
     imagen = equalizeIntensity(imagen); // ecualización del canal de intensidad 
@@ -122,6 +102,25 @@ void binarizacion(Mat& imagen, const std::string& nombre_imagen) {
     imwrite(ruta, imagen);
 }
 
+// https://stackoverflow.com/a/8467129
+void contorno(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours) {
+    // Mat contourOutput = imagen.clone();
+    findContours(imagen, contours, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
+
+    //Draw the contours
+    Mat contourImage(imagen.size(), CV_8UC3, Scalar(0,0,0));
+    Scalar colors[3];
+    colors[0] = Scalar(255, 0, 0);
+    colors[1] = Scalar(0, 255, 0);
+    colors[2] = Scalar(0, 0, 255);
+    // for (size_t i = 0; i < contours.size(); i++) {
+    //     drawContours(contourImage, contours, i, colors[idx % 3]); // dibuja en contourImage el contorno contours[i]
+    // }
+    drawContours(contourImage, contours, -1, colors[1]);
+
+    std::string ruta = std::string("./Contornos/") + nombre_imagen;
+    imwrite(ruta, contourImage);
+}
 
 bool ordenar_por_area(const std::vector<Point>& p1, const std::vector<Point>& p2) {
     return contourArea(p1) < contourArea(p2);
@@ -222,14 +221,15 @@ bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
 //     imwrite(contorno);
 // }
 
+// http://docs.opencv.org/3.1.0/d1/dee/tutorial_introduction_to_pca.html
 void drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale = 0.2)
 {
     double angle;
     double hypotenuse;
     angle = atan2( (double) p.y - q.y, (double) p.x - q.x ); // angle in radians
     hypotenuse = sqrt( (double) (p.y - q.y) * (p.y - q.y) + (p.x - q.x) * (p.x - q.x));
-//    double degrees = angle * 180 / CV_PI; // convert radians to degrees (0-180 range)
-//    cout << "Degrees: " << abs(degrees - 180) << endl; // angle in 0-360 degrees range
+    // double degrees = angle * 180 / CV_PI; // convert radians to degrees (0-180 range)
+    // cout << "Degrees: " << abs(degrees - 180) << endl; // angle in 0-360 degrees range
     // Here we lengthen the arrow by a factor of scale
     q.x = (int) (p.x - scale * hypotenuse * cos(angle));
     q.y = (int) (p.y - scale * hypotenuse * sin(angle));
@@ -242,6 +242,7 @@ void drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale = 0.2
     p.y = (int) (q.y + 9 * sin(angle - CV_PI / 4));
     line(img, p, q, colour, 1, CV_AA);
 }
+
 double getOrientation(const std::vector<Point> &pts, Mat &img)
 {
     //Construct a buffer used by the pca analysis
@@ -276,6 +277,7 @@ double getOrientation(const std::vector<Point> &pts, Mat &img)
     return angle;
 }
 
+// https://stackoverflow.com/a/24352524
 void rotar_imagen(Mat& imagen, double angulo) {
     Point2f centro(imagen.cols/2.0, imagen.rows/2.0);
     Mat rotacion = getRotationMatrix2D(centro, angulo, 1.0); // este ángulo es en grados
@@ -289,19 +291,23 @@ void rotar_imagen(Mat& imagen, double angulo) {
 }
 
 void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std::vector<Point>& contorno) {
-    Rect rectangulo = boundingRect(contorno);
-    rectangle(imagen, rectangulo, Scalar(255));
+    // Rect rectangulo = boundingRect(contorno);
+    // rectangle(imagen, rectangulo, Scalar(255));
 
     // https://stackoverflow.com/a/8110695
-    Mat roi = Mat(imagen, rectangulo).clone();
+    // Mat roi = Mat(imagen, rectangulo).clone();
     
-    // double angulo = getOrientation(contorno, roi);
+    // double angulo = getOrientation(contorno, roi); // en radianes
     double angulo = getOrientation(contorno, imagen); // en radianes
+
+    // pasar a grados
+    angulo = angulo*180.0/CV_PI;
+
     // angulo = std::min(angulo, CV_PI -angulo);
-    debug(angulo*180.0/CV_PI);
+    debug(angulo);
     
-    // rotar_imagen(roi, -angulo);
-    rotar_imagen(imagen, angulo*180.0/CV_PI); // ángulo en grados
+    // rotar_imagen(roi, angulo);
+    rotar_imagen(imagen, angulo); // ángulo en grados
 
     std::string ruta = std::string("./Normalizadas/") + nombre_imagen;
     // imwrite(ruta, roi);

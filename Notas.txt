@@ -14,3 +14,10 @@ Imágenes en donde no se detectó el contorno del espermatozoide:
 99
 
 Para extraer la región de la cabeza, necesito sacar el contorno con segunda mayor área, pero que esta área sea mayor que un valor determinado y que cumpla la forma ovalada.
+
+Imágenes en las que falla la normalización de pose:
+Si el eigenvector blanco está hacia abajo (posibles opciones):
+- reflejar la imagen con respecto al eigenvector negro.
+- rotar la imagen 180 grados <--- esta es la idea
+ * Esto funciona con todas las imágenes, excepto con la #100.
+ 
