@@ -138,8 +138,8 @@ como mínimo area_threshold de área.
 como mínimo el mayor área entre area_threshold y el área del contorno con tercera mayor área. 
 */
 
-
-void deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours) {
+// Retorna true si hay que eliminar la imagen, false en caso contrario.
+bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours, int& contorno_cabeza) {
     SimpleBlobDetector::Params params;
 
     // params.filterByCircularity = true;
@@ -149,8 +149,7 @@ void deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
     double menorArea = 1e9;
 
     int num_contours = contours.size();
-    debug(num_contours);
-    if (num_contours == 1) return; // Ignorar las cabezas en los extremos
+    if (num_contours == 1) return true; // Ignorar las cabezas en los extremos
 
     std::sort(contours.begin(), contours.end(), ordenar_por_area);
 
@@ -187,7 +186,6 @@ void deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
 
         Point2f punto_central = keypoints[0].pt;
         
-        int contorno_cabeza = 0;
         for (int i = 0; i < contours.size(); i++) {
             int dentro = pointPolygonTest(contours[i], punto_central, false);
             if (dentro == 1) {
@@ -206,28 +204,63 @@ void deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
 
         // guardar la imagen creada
         imagen = imagenFinal;
+        return false;
+    }
+    else {
+        return true;
     }
 }
 
-void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen) {
+// void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std::vector<Point>& contorno) {
+//     RotatedRect rectangulo = minAreaRect(contorno);
+//     Point2f puntos[4];
+//     rectangulo.points(puntos);
+    
+//     Mat imagen_cortada;
+//     drawContours(imagen_cortada, contours, contorno_cabeza, Scalar(255), -1);
+//     imwrite(contorno);
+// }
 
+void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std::vector<Point>& contorno) {
+    Rect rectangulo = boundingRect(contorno);
+
+    // drawContours(imagen, contours, contorno_cabeza, Scalar(255), -1);
+    rectangle(imagen, rectangulo, Scalar(255));
+
+    std::string ruta = std::string("./Normalizadas/") + nombre_imagen;
+    imwrite(ruta, imagen);
 }
 
 int main() {
-    std::vector<std::string> nombresImagenes;
-    std::vector<Mat> imagenes;
-    leer_imagenes(nombresImagenes, imagenes);
-    for (size_t i = 0; i < imagenes.size(); i++) {
-        imagenes[i] = quitar_margen(imagenes[i], 4);
-        // OE1: Mejora de contraste y segmentación
-        binarizacion(imagenes[i], nombresImagenes[i]);
-        std::vector<std::vector<Point> > contours;
-        contorno(imagenes[i], nombresImagenes[i], contours);
-        deteccion(imagenes[i], nombresImagenes[i], contours);
-        // OE2: Normalización de pose
-        normalizacion_pose(imagenes[i], nombresImagenes[i]);
+    std::vector<std::string> nombresImagenes_OE1;
+    std::vector<Mat> imagenes_OE1;
+    leer_imagenes(nombresImagenes_OE1, imagenes_OE1);
+    std::vector<std::vector<Point> > contornos_OE1;
+
+    std::vector<std::string> nombresImagenes_OE2;
+    std::vector<Mat> imagenes_OE2;
+    std::vector<std::vector<Point> > contornos_OE2;
+    
+    // OE1: Mejora de contraste y segmentación
+    for (size_t i = 0; i < imagenes_OE1.size(); i++) {
+        imagenes_OE1[i] = quitar_margen(imagenes_OE1[i], 4);
+        binarizacion(imagenes_OE1[i], nombresImagenes_OE1[i]);
+        contorno(imagenes_OE1[i], nombresImagenes_OE1[i], contornos_OE1);
+        int ind_contorno = 0;
+        bool eliminar_imagen = deteccion(imagenes_OE1[i], nombresImagenes_OE1[i], contornos_OE1, ind_contorno);
+
+        if (!eliminar_imagen) {
+            imagenes_OE2.push_back(imagenes_OE1[i].clone());
+            nombresImagenes_OE2.push_back(nombresImagenes_OE1[i]);
+            contornos_OE2.push_back(contornos_OE1[ind_contorno]);
+        }
+
     }
 
+    // OE2: Normalización de pose
+    for (size_t i = 0; i < imagenes_OE2.size(); i++) {
+        normalizacion_pose(imagenes_OE2[i], nombresImagenes_OE2[i], contornos_OE2[i]);
+    }
 
 }
 

@@ -9,3 +9,5 @@ compile_commands.json
 CTestTestfile.cmake
 a.out
 tesis.out
+canny.out
+contornos.out
