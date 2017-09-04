@@ -1,0 +1,16 @@
+Imágenes en donde no se detectó el contorno del espermatozoide:
+7
+10
+25
+27
+30 (hay un objeto que no es el espermatozoide)
+31
+34
+36
+41
+62 (hay dos objetos que no son espermatozoides)
+65
+67
+99
+
+Para extraer la región de la cabeza, necesito sacar el contorno con segunda mayor área, pero que esta área sea mayor que un valor determinado y que cumpla la forma ovalada.
