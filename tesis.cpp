@@ -34,17 +34,17 @@ Mat equalizeIntensity(const Mat& inputImage) {
 }
 
 
-cv::Mat quitar_margen(const cv::Mat& imagen, int margen) {
-    cv::Mat nueva(imagen.rows - 2*margen, imagen.cols - 2*margen, imagen.type());
+Mat quitar_margen(const Mat& imagen, int margen) {
+    Mat nueva(imagen.rows - 2*margen, imagen.cols - 2*margen, imagen.type());
     for (int r = margen; r < imagen.rows - margen; r++) {
         for (int c = margen; c < imagen.cols - margen; c++) {
-            nueva.at<cv::Vec3b>(r-margen, c-margen) = imagen.at<cv::Vec3b>(r, c);
+            nueva.at<Vec3b>(r-margen, c-margen) = imagen.at<Vec3b>(r, c);
         }
     }
     return nueva;
 }
 
-void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<cv::Mat>& imagenes) {
+void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<Mat>& imagenes) {
     struct dirent** namelist;
     int n = scandir("./Imagenes", &namelist, NULL, versionsort);
     if (n < 0) {
@@ -56,7 +56,7 @@ void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<cv::M
             auto ind_extension = nombre.find(".jpg");
             if (ind_extension != std::string::npos) {
                 std::string ruta = std::string("./Imagenes/") + nombre;
-                cv::Mat imagen = cv::imread(ruta);
+                Mat imagen = imread(ruta);
                 if (imagen.empty()) continue;
                 nombre.erase(ind_extension);
                 nombre += ".png";
@@ -70,59 +70,59 @@ void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<cv::M
 }
 
 // https://stackoverflow.com/a/8467129
-void contorno(cv::Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<cv::Point> >& contours) {
-    // cv::Mat contourOutput = imagen.clone();
-    cv::findContours(imagen, contours, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
+void contorno(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours) {
+    // Mat contourOutput = imagen.clone();
+    findContours(imagen, contours, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
 
     //Draw the contours
-    cv::Mat contourImage(imagen.size(), CV_8UC3, cv::Scalar(0,0,0));
-    cv::Scalar colors[3];
-    colors[0] = cv::Scalar(255, 0, 0);
-    colors[1] = cv::Scalar(0, 255, 0);
-    colors[2] = cv::Scalar(0, 0, 255);
+    Mat contourImage(imagen.size(), CV_8UC3, Scalar(0,0,0));
+    Scalar colors[3];
+    colors[0] = Scalar(255, 0, 0);
+    colors[1] = Scalar(0, 255, 0);
+    colors[2] = Scalar(0, 0, 255);
     // for (size_t i = 0; i < contours.size(); i++) {
-    //     cv::drawContours(contourImage, contours, i, colors[idx % 3]); // dibuja en contourImage el contorno contours[i]
+    //     drawContours(contourImage, contours, i, colors[idx % 3]); // dibuja en contourImage el contorno contours[i]
     // }
-    cv::drawContours(contourImage, contours, -1, colors[1]);
+    drawContours(contourImage, contours, -1, colors[1]);
 
     std::string ruta = std::string("./Contornos/") + nombre_imagen;
-    cv::imwrite(ruta, contourImage);
+    imwrite(ruta, contourImage);
 }
 
-void binarizacion(cv::Mat& imagen, const std::string& nombre_imagen) {
+void binarizacion(Mat& imagen, const std::string& nombre_imagen) {
 
     imagen = equalizeIntensity(imagen); // ecualización del canal de intensidad 
     double spatialWindowRadius = 2; // sp
     double colorWindowRadius = 5; // sr
 
     // 1. Aplicar Mean Shift a la imagen a color.
-    cv::pyrMeanShiftFiltering(imagen, imagen, spatialWindowRadius, colorWindowRadius);
+    pyrMeanShiftFiltering(imagen, imagen, spatialWindowRadius, colorWindowRadius);
 
     // 2. Aplicar Gaussian Blur a la imagen en escala de grises.
-    cv::cvtColor(imagen, imagen, cv::COLOR_BGR2GRAY);
+    cvtColor(imagen, imagen, COLOR_BGR2GRAY);
     for (int j = 1; j < 11; j += 2) {
-        cv::GaussianBlur(imagen, imagen, Size(j, j), 0);
+        GaussianBlur(imagen, imagen, Size(j, j), 0);
     }
     
     // 3. Hacer un resize
-    cv::resize(imagen, imagen, cv::Size(0, 0), 8.0, 8.0, cv::INTER_CUBIC);
+    resize(imagen, imagen, Size(0, 0), 8.0, 8.0, INTER_CUBIC);
 
     // 4. Aumentar el contraste
-    cv::equalizeHist(imagen, imagen);
+    equalizeHist(imagen, imagen);
 
     // 5. Hacer el threshold
     // El área oscura dentro de un espermatozoide (los píxeles entre 0 y 2) es la parte inferior de la cabeza (cercana a la cola).
     // No funciona bien con la imagen 14 (posible opción: descartarla)
-    // cv::inRange(imagen, cv::Scalar(3), cv::Scalar(25), imagen);
-    cv::inRange(imagen, cv::Scalar(0), cv::Scalar(25), imagen);
-    cv::bitwise_not(imagen, imagen);
+    // inRange(imagen, Scalar(3), Scalar(25), imagen);
+    inRange(imagen, Scalar(0), Scalar(25), imagen);
+    bitwise_not(imagen, imagen);
 
     std::string ruta = std::string("./ImagenesBinarizadas/") + nombre_imagen;
-    cv::imwrite(ruta, imagen);
+    imwrite(ruta, imagen);
 }
 
 
-bool ordenar_por_area(const std::vector<cv::Point>& p1, const std::vector<cv::Point>& p2) {
+bool ordenar_por_area(const std::vector<Point>& p1, const std::vector<Point>& p2) {
     return contourArea(p1) < contourArea(p2);
 }
 
@@ -139,7 +139,7 @@ como mínimo el mayor área entre area_threshold y el área del contorno con ter
 */
 
 
-void deteccion(cv::Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<cv::Point> >& contours) {
+void deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours) {
     SimpleBlobDetector::Params params;
 
     // params.filterByCircularity = true;
@@ -155,7 +155,6 @@ void deteccion(cv::Mat& imagen, const std::string& nombre_imagen, std::vector<st
     std::sort(contours.begin(), contours.end(), ordenar_por_area);
 
     double area_threshold = 5000.0;
-
     params.filterByArea = true;
     if (num_contours > 2) {
         params.minArea = std::max(contourArea(contours[num_contours-3]) + 1, area_threshold);
@@ -172,14 +171,16 @@ void deteccion(cv::Mat& imagen, const std::string& nombre_imagen, std::vector<st
     params.minInertiaRatio = 0.1;
     // params.maxInertiaRatio = 0.9;
 
-    cv::Ptr<SimpleBlobDetector> detector = SimpleBlobDetector::create(params);
+    Ptr<SimpleBlobDetector> detector = SimpleBlobDetector::create(params);
 
-    cv::Mat contourImage(imagen.size(), CV_8UC1, cv::Scalar(0));
-    cv::drawContours(contourImage, contours, -1, cv::Scalar(255));
+    Mat contourImage(imagen.size(), CV_8UC1, Scalar(0));
+    drawContours(contourImage, contours, -1, Scalar(255));
     
     std::vector<KeyPoint> keypoints;
     detector->detect(contourImage, keypoints);
 
+    // Si encontré un solo keypoint, busco la región que contiene a este punto. Esta región es la cabeza del espermatozoide.
+    // https://stackoverflow.com/a/30810250
     if (keypoints.size() == 1) {
         Mat imagen_con_keypoints;
         drawKeypoints(contourImage, keypoints, imagen_con_keypoints, Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
@@ -196,27 +197,35 @@ void deteccion(cv::Mat& imagen, const std::string& nombre_imagen, std::vector<st
             }
         }
     
-        cv::Mat imagenFinal(imagen.size(), CV_8UC1, cv::Scalar(0));
-        cv::drawContours(imagenFinal, contours, contorno_cabeza, cv::Scalar(255), -1);
+        Mat imagenFinal(imagen.size(), CV_8UC1, Scalar(0));
+        // Grafico la región del keypoint enocntrado
+        drawContours(imagenFinal, contours, contorno_cabeza, Scalar(255), -1);
         std::string ruta = std::string("./Blobs/") + nombre_imagen;
-        // cv::imwrite(ruta, imagen_con_keypoints);
-        cv::imwrite(ruta, imagenFinal);
+        // imwrite(ruta, imagen_con_keypoints);
+        imwrite(ruta, imagenFinal);
 
-
+        // guardar la imagen creada
+        imagen = imagenFinal;
     }
+}
+
+void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen) {
+
 }
 
 int main() {
     std::vector<std::string> nombresImagenes;
-    std::vector<cv::Mat> imagenes;
+    std::vector<Mat> imagenes;
     leer_imagenes(nombresImagenes, imagenes);
     for (size_t i = 0; i < imagenes.size(); i++) {
         imagenes[i] = quitar_margen(imagenes[i], 4);
+        // OE1: Mejora de contraste y segmentación
         binarizacion(imagenes[i], nombresImagenes[i]);
-        std::vector<std::vector<cv::Point> > contours;
+        std::vector<std::vector<Point> > contours;
         contorno(imagenes[i], nombresImagenes[i], contours);
-        debug(i);
         deteccion(imagenes[i], nombresImagenes[i], contours);
+        // OE2: Normalización de pose
+        normalizacion_pose(imagenes[i], nombresImagenes[i]);
     }
 
 
