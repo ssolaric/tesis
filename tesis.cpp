@@ -52,11 +52,14 @@ void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<cv::M
     }
     else {
         for (int i = 0; i < n; i++) {
-            const char* nombre = namelist[i]->d_name;
-            if (std::strstr(nombre, ".jpg") != NULL) {
+            std::string nombre(namelist[i]->d_name);
+            auto ind_extension = nombre.find(".jpg");
+            if (ind_extension != std::string::npos) {
                 std::string ruta = std::string("./Imagenes/") + nombre;
                 cv::Mat imagen = cv::imread(ruta);
                 if (imagen.empty()) continue;
+                nombre.erase(ind_extension);
+                nombre += ".png";
                 imagenes.push_back(imagen);
                 nombres_imagenes.push_back(nombre);
             }
@@ -118,8 +121,25 @@ void binarizacion(cv::Mat& imagen, const std::string& nombre_imagen) {
     cv::imwrite(ruta, imagen);
 }
 
+
+bool ordenar_por_area(const std::vector<cv::Point>& p1, const std::vector<cv::Point>& p2) {
+    return contourArea(p1) < contourArea(p2);
+}
+
 // Para extraer la región de la cabeza, necesito sacar el contorno con segunda mayor área, pero que esta área sea mayor que un valor determinado y que cumpla la forma ovalada.
-void deteccion(cv::Mat& imagen, const std::string& nombre_imagen, const std::vector<std::vector<cv::Point> >& contours) {
+/*
+Casos:
+1. num_contours == 1: se descartan estas imágenes porque las cabezas están en los extremos
+
+En los siguientes casos se establece un threshold de área = 5000.
+2. num_contours == 2: se obtiene el contorno con segunda mayor área, que debe tener 
+como mínimo area_threshold de área.
+3. num_contours > 2: se obtiene el contorno con segunda mayor área, que debe tener 
+como mínimo el mayor área entre area_threshold y el área del contorno con tercera mayor área. 
+*/
+
+
+void deteccion(cv::Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<cv::Point> >& contours) {
     SimpleBlobDetector::Params params;
 
     // params.filterByCircularity = true;
@@ -127,39 +147,63 @@ void deteccion(cv::Mat& imagen, const std::string& nombre_imagen, const std::vec
 
     double mayorArea = 0.0;
     double menorArea = 1e9;
-    debug(contours.size());
-    for (size_t i = 0; i < contours.size(); i++) {
-        double area = contourArea(contours[i]);
-        mayorArea = std::max(mayorArea, area);
-        menorArea = std::min(menorArea, area);
-    }
-    debug(menorArea);
-    debug(mayorArea);
-    cv::Mat contourImage(imagen.size(), CV_8UC3, cv::Scalar(0,0,0));
-    
+
+    int num_contours = contours.size();
+    debug(num_contours);
+    if (num_contours == 1) return; // Ignorar las cabezas en los extremos
+
+    std::sort(contours.begin(), contours.end(), ordenar_por_area);
+
+    double area_threshold = 5000.0;
 
     params.filterByArea = true;
-    params.minArea = menorArea;
-    params.maxArea = mayorArea;
+    if (num_contours > 2) {
+        params.minArea = std::max(contourArea(contours[num_contours-3]) + 1, area_threshold);
+    }
+    else {
+        params.minArea = area_threshold;
+    }
+    params.maxArea = contourArea(contours[num_contours-2]) + 10;
 
     params.filterByConvexity = true;
     params.minConvexity = 0.1;
 
     params.filterByInertia = true;
-    params.minInertiaRatio = 0.3;
+    params.minInertiaRatio = 0.1;
     // params.maxInertiaRatio = 0.9;
 
     cv::Ptr<SimpleBlobDetector> detector = SimpleBlobDetector::create(params);
 
+    cv::Mat contourImage(imagen.size(), CV_8UC1, cv::Scalar(0));
+    cv::drawContours(contourImage, contours, -1, cv::Scalar(255));
+    
     std::vector<KeyPoint> keypoints;
-    detector->detect(imagen, keypoints);
+    detector->detect(contourImage, keypoints);
 
-    Mat imagen_con_keypoints;
-    drawKeypoints(imagen, keypoints, imagen_con_keypoints, Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    if (keypoints.size() == 1) {
+        Mat imagen_con_keypoints;
+        drawKeypoints(contourImage, keypoints, imagen_con_keypoints, Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-    std::string ruta = std::string("./Blobs/") + nombre_imagen;
-    cv::imwrite(ruta, imagen_con_keypoints);
+        Point2f punto_central = keypoints[0].pt;
+        
+        int contorno_cabeza = 0;
+        for (int i = 0; i < contours.size(); i++) {
+            int dentro = pointPolygonTest(contours[i], punto_central, false);
+            if (dentro == 1) {
+                // encontré el contorno necesario
+                contorno_cabeza = i;
+                break;
+            }
+        }
+    
+        cv::Mat imagenFinal(imagen.size(), CV_8UC1, cv::Scalar(0));
+        cv::drawContours(imagenFinal, contours, contorno_cabeza, cv::Scalar(255), -1);
+        std::string ruta = std::string("./Blobs/") + nombre_imagen;
+        // cv::imwrite(ruta, imagen_con_keypoints);
+        cv::imwrite(ruta, imagenFinal);
 
+
+    }
 }
 
 int main() {
