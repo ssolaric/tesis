@@ -8,42 +8,8 @@
 #include <stdlib.h>
 
 #include <opencv2/opencv.hpp>
+#include "auxiliar.h"
 using namespace cv;
-
-
-// https://stackoverflow.com/a/15009815
-Mat equalizeIntensity(const Mat& inputImage) {
-    if(inputImage.channels() >= 3)
-    {
-        Mat ycrcb;
-
-        cvtColor(inputImage,ycrcb,CV_BGR2YCrCb);
-
-        std::vector<Mat> channels;
-        split(ycrcb,channels);
-
-        equalizeHist(channels[0], channels[0]);
-
-        Mat result;
-        merge(channels,ycrcb);
-
-        cvtColor(ycrcb,result,CV_YCrCb2BGR);
-
-        return result;
-    }
-    return Mat();
-}
-
-
-Mat quitar_margen(const Mat& imagen, int margen) {
-    Mat nueva(imagen.rows - 2*margen, imagen.cols - 2*margen, imagen.type());
-    for (int r = margen; r < imagen.rows - margen; r++) {
-        for (int c = margen; c < imagen.cols - margen; c++) {
-            nueva.at<Vec3b>(r-margen, c-margen) = imagen.at<Vec3b>(r, c);
-        }
-    }
-    return nueva;
-}
 
 void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<Mat>& imagenes) {
     struct dirent** namelist;
@@ -68,6 +34,16 @@ void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<Mat>&
         }
         free(namelist);
     }
+}
+
+Mat quitar_margen(const Mat& imagen, int margen) {
+    Mat nueva(imagen.rows - 2*margen, imagen.cols - 2*margen, imagen.type());
+    for (int r = margen; r < imagen.rows - margen; r++) {
+        for (int c = margen; c < imagen.cols - margen; c++) {
+            nueva.at<Vec3b>(r-margen, c-margen) = imagen.at<Vec3b>(r, c);
+        }
+    }
+    return nueva;
 }
 
 void binarizacion(Mat& imagen, const std::string& nombre_imagen) {
@@ -122,24 +98,19 @@ void contorno(Mat& imagen, const std::string& nombre_imagen, std::vector<std::ve
     imwrite(ruta, contourImage);
 }
 
-bool ordenar_por_area(const std::vector<Point>& p1, const std::vector<Point>& p2) {
-    return contourArea(p1) < contourArea(p2);
-}
-
-// Para extraer la región de la cabeza, necesito sacar el contorno con segunda mayor área, pero que esta área sea mayor que un valor determinado y que cumpla la forma ovalada.
-/*
-Casos:
-1. num_contours == 1: se descartan estas imágenes porque las cabezas están en los extremos
-
-En los siguientes casos se establece un threshold de área = 5000.
-2. num_contours == 2: se obtiene el contorno con segunda mayor área, que debe tener 
-como mínimo area_threshold de área.
-3. num_contours > 2: se obtiene el contorno con segunda mayor área, que debe tener 
-como mínimo el mayor área entre area_threshold y el área del contorno con tercera mayor área. 
-*/
-
 // Retorna true si hay que eliminar la imagen, false en caso contrario.
 bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours, int& contorno_cabeza) {
+    // Para extraer la región de la cabeza, necesito sacar el contorno con segunda mayor área, pero que esta área sea mayor que un valor determinado y que cumpla la forma ovalada.
+    /*
+    Casos:
+    1. num_contours == 1: se descartan estas imágenes porque las cabezas están en los extremos
+
+    En los siguientes casos se establece un threshold de área = 5000.
+    2. num_contours == 2: se obtiene el contorno con segunda mayor área, que debe tener 
+    como mínimo area_threshold de área.
+    3. num_contours > 2: se obtiene el contorno con segunda mayor área, que debe tener 
+    como mínimo el mayor área entre area_threshold y el área del contorno con tercera mayor área. 
+    */
     SimpleBlobDetector::Params params;
 
     // params.filterByCircularity = true;
@@ -168,7 +139,6 @@ bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
 
     params.filterByInertia = true;
     params.minInertiaRatio = 0.1;
-    // params.maxInertiaRatio = 0.9;
 
     Ptr<SimpleBlobDetector> detector = SimpleBlobDetector::create(params);
 
@@ -194,12 +164,11 @@ bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
                 break;
             }
         }
-    
-        Mat imagenFinal(imagen.size(), CV_8UC1, Scalar(0));
+
         // Grafico la región del keypoint enocntrado
+        Mat imagenFinal(imagen.size(), CV_8UC1, Scalar(0));
         drawContours(imagenFinal, contours, contorno_cabeza, Scalar(255), -1);
         std::string ruta = std::string("./Blobs/") + nombre_imagen;
-        // imwrite(ruta, imagen_con_keypoints);
         imwrite(ruta, imagenFinal);
 
         // guardar la imagen creada
@@ -211,106 +180,36 @@ bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
     }
 }
 
-// void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std::vector<Point>& contorno) {
-//     RotatedRect rectangulo = minAreaRect(contorno);
-//     Point2f puntos[4];
-//     rectangulo.points(puntos);
-    
-//     Mat imagen_cortada;
-//     drawContours(imagen_cortada, contours, contorno_cabeza, Scalar(255), -1);
-//     imwrite(contorno);
-// }
-
-// http://docs.opencv.org/3.1.0/d1/dee/tutorial_introduction_to_pca.html
-void drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale = 0.2)
-{
-    double angle;
-    double hypotenuse;
-    angle = atan2( (double) p.y - q.y, (double) p.x - q.x ); // angle in radians
-    hypotenuse = sqrt( (double) (p.y - q.y) * (p.y - q.y) + (p.x - q.x) * (p.x - q.x));
-    // double degrees = angle * 180 / CV_PI; // convert radians to degrees (0-180 range)
-    // cout << "Degrees: " << abs(degrees - 180) << endl; // angle in 0-360 degrees range
-    // Here we lengthen the arrow by a factor of scale
-    q.x = (int) (p.x - scale * hypotenuse * cos(angle));
-    q.y = (int) (p.y - scale * hypotenuse * sin(angle));
-    line(img, p, q, colour, 1, CV_AA);
-    // create the arrow hooks
-    p.x = (int) (q.x + 9 * cos(angle + CV_PI / 4));
-    p.y = (int) (q.y + 9 * sin(angle + CV_PI / 4));
-    line(img, p, q, colour, 1, CV_AA);
-    p.x = (int) (q.x + 9 * cos(angle - CV_PI / 4));
-    p.y = (int) (q.y + 9 * sin(angle - CV_PI / 4));
-    line(img, p, q, colour, 1, CV_AA);
-}
-
-double getOrientation(const std::vector<Point> &pts, Mat &img)
-{
-    //Construct a buffer used by the pca analysis
-    int sz = static_cast<int>(pts.size());
-    Mat data_pts = Mat(sz, 2, CV_64FC1);
-    for (int i = 0; i < data_pts.rows; ++i)
-    {
-        data_pts.at<double>(i, 0) = pts[i].x;
-        data_pts.at<double>(i, 1) = pts[i].y;
-    }
-    //Perform PCA analysis
-    PCA pca_analysis(data_pts, Mat(), CV_PCA_DATA_AS_ROW);
-    //Store the center of the object
-    Point cntr = Point(static_cast<int>(pca_analysis.mean.at<double>(0, 0)),
-                      static_cast<int>(pca_analysis.mean.at<double>(0, 1)));
-    //Store the eigenvalues and eigenvectors
-    std::vector<Point2d> eigen_vecs(2);
-    std::vector<double> eigen_val(2);
-    for (int i = 0; i < 2; ++i)
-    {
-        eigen_vecs[i] = Point2d(pca_analysis.eigenvectors.at<double>(i, 0),
-                                pca_analysis.eigenvectors.at<double>(i, 1));
-        eigen_val[i] = pca_analysis.eigenvalues.at<double>(0, i);
-    }
-    // Draw the principal components
-    circle(img, cntr, 3, Scalar(255, 0, 255), 2);
-    Point p1 = cntr + 0.02 * Point(static_cast<int>(eigen_vecs[0].x * eigen_val[0]), static_cast<int>(eigen_vecs[0].y * eigen_val[0]));
-    Point p2 = cntr - 0.02 * Point(static_cast<int>(eigen_vecs[1].x * eigen_val[1]), static_cast<int>(eigen_vecs[1].y * eigen_val[1]));
-    drawAxis(img, cntr, p1, Scalar(0, 255, 0), 1);
-    drawAxis(img, cntr, p2, Scalar(255, 255, 0), 5);
-    double angle = atan2(eigen_vecs[0].y, eigen_vecs[0].x); // orientation in radians
-    return angle;
-}
-
-// https://stackoverflow.com/a/24352524
-void rotar_imagen(Mat& imagen, double angulo) {
-    Point2f centro(imagen.cols/2.0, imagen.rows/2.0);
-    Mat rotacion = getRotationMatrix2D(centro, angulo, 1.0); // este ángulo es en grados
-
-    Rect bbox = RotatedRect(centro, imagen.size(), angulo).boundingRect();
-
-    rotacion.at<double>(0, 2) += bbox.width/2.0 - centro.x;
-    rotacion.at<double>(1, 2) += bbox.height/2.0 - centro.y;
-
-    warpAffine(imagen, imagen, rotacion, bbox.size());
-}
-
 void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std::vector<Point>& contorno) {
-    // Rect rectangulo = boundingRect(contorno);
-    // rectangle(imagen, rectangulo, Scalar(255));
-
-    // https://stackoverflow.com/a/8110695
-    // Mat roi = Mat(imagen, rectangulo).clone();
-    
-    // double angulo = getOrientation(contorno, roi); // en radianes
-    double angulo = getOrientation(contorno, imagen); // en radianes
-
+    std::vector<Point2d> eigen_vecs(2);
+    double angulo = getOrientation(contorno, imagen, eigen_vecs); // en radianes
     // pasar a grados
     angulo = angulo*180.0/CV_PI;
-
-    // angulo = std::min(angulo, CV_PI -angulo);
-    debug(angulo);
     
-    // rotar_imagen(roi, angulo);
-    rotar_imagen(imagen, angulo); // ángulo en grados
+    
+    // if (prod_cruz < 0) {
+    //     debug(indice);
+    //     debug(angulo);
+    //     // angulo += 180.0;
+    // }
 
+    
+
+    rotar_imagen(imagen, angulo); // ángulo en grados
+    // rotar los dos eigenvectors
+    Point2f centro(imagen.cols/2.0, imagen.rows/2.0);
+    Mat rotacion = getRotationMatrix2D(centro, angulo, 1.0);
+    std::vector<Point2d> eigen_vecs_rotados(2);
+    transform(eigen_vecs, eigen_vecs_rotados, rotacion);
+
+    // warpAffine(eigen_vecs, eigen_vecs_rotados, rotacion, eigen_vecs_rotados.size())
+
+
+
+    int prod_cruz = eigen_vecs[0].cross(eigen_vecs[1]);
+    debug(nombre_imagen);
+    debug(prod_cruz);
     std::string ruta = std::string("./Normalizadas/") + nombre_imagen;
-    // imwrite(ruta, roi);
     imwrite(ruta, imagen);
 }
 
@@ -346,5 +245,3 @@ int main() {
     }
 
 }
-
-// TODO: preguntar cómo hacer la segmentación de las cabezas y preparar la normalización de pose
