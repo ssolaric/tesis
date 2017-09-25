@@ -9,7 +9,7 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 add_executable(tesis.out tesis.cpp)
-target_link_libraries(tesis.out ${OpenCV_LIBS})
+target_link_libraries(tesis.out ${OpenCV_LIBS} openvdb pthread Half tbb)
 
 add_executable(contornos.out contornos.cpp)
 target_link_libraries(contornos.out ${OpenCV_LIBS})

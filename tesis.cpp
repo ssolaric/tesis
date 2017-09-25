@@ -8,6 +8,8 @@
 #include <stdlib.h>
 
 #include <opencv2/opencv.hpp>
+#include <openvdb/openvdb.h>
+
 #include "auxiliar.h"
 using namespace cv;
 
@@ -207,10 +209,49 @@ void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std
 
 
     int prod_cruz = eigen_vecs[0].cross(eigen_vecs[1]);
-    debug(nombre_imagen);
-    debug(prod_cruz);
+    // debug(nombre_imagen);
+    // debug(prod_cruz);
     std::string ruta = std::string("./Normalizadas/") + nombre_imagen;
     imwrite(ruta, imagen);
+}
+
+
+void reconstruccion(std::vector<Mat>& imagenes) {
+    // 1. Construir el cubo
+    openvdb::initialize();
+    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(2.0);
+    openvdb::Vec3f centro = openvdb::Vec3f(0,0,0);
+    float arista = 100.0f;
+
+    int dim = int(arista / 2);
+    
+    openvdb::Coord ijk; // coordenada que servirá para recorrer el bounding box
+    // Hacer que estos índices i, j y k referencien a la coordenada que usamos para recorrer.
+    int& i = ijk[0];
+    int& j = ijk[1];
+    int& k = ijk[2];
+    auto accessor = grid->getAccessor();
+    for (i = centro[0] - dim; i <= centro[0] + dim; i++) {
+        for (j = centro[1] - dim; j <= centro[1] + dim; j++) {
+            for (k = centro[2] - dim; k <= centro[2] + dim; k++) {
+                accessor.setValue(ijk, 0);
+            }
+        }
+    }
+    
+    // Metadatos
+    grid->insertMeta("arista", openvdb::FloatMetadata(arista));
+    
+    // Esta transformación es un scale, hace que el tamaño de un vóxel sea 0.5 unidades en world space.
+    grid->setTransform(openvdb::math::Transform::createLinearTransform(0.5));
+    grid->setName("Cubo");
+
+    openvdb::io::File file("cubo.vdb");
+    openvdb::GridPtrVec grids;
+    grids.push_back(grid);
+    file.write(grids);
+    file.close();
+
 }
 
 int main() {
@@ -243,5 +284,12 @@ int main() {
     for (size_t i = 0; i < imagenes_OE2.size(); i++) {
         normalizacion_pose(imagenes_OE2[i], nombresImagenes_OE2[i], contornos_OE2[i]);
     }
+
+    // OE3: Reconstrucción
+    auto it_ini = imagenes_OE2.begin();
+    std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 10)); // coger las 10 primeras imágenes por mientras
+
+    reconstruccion(imagenes_OE3);
+
 
 }
