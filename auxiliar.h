@@ -50,7 +50,7 @@ void drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale = 0.2
     line(img, p, q, colour, 1, CV_AA);
 }
 
-double getOrientation(const std::vector<Point> &pts, Mat &img, std::vector<Point2d>& eigen_vecs) {
+double getOrientation(const std::vector<Point> &pts, Mat &img) {
     //Construct a buffer used by the pca analysis
     int sz = static_cast<int>(pts.size());
     Mat data_pts = Mat(sz, 2, CV_64FC1);
@@ -64,6 +64,7 @@ double getOrientation(const std::vector<Point> &pts, Mat &img, std::vector<Point
     Point cntr = Point(static_cast<int>(pca_analysis.mean.at<double>(0, 0)),
                     static_cast<int>(pca_analysis.mean.at<double>(0, 1)));
     //Store the eigenvalues and eigenvectors
+    std::vector<Point2d> eigen_vecs(2);
     std::vector<double> eigen_val(2);
     for (int i = 0; i < 2; ++i) {
         eigen_vecs[i] = Point2d(pca_analysis.eigenvectors.at<double>(i, 0),
@@ -71,11 +72,12 @@ double getOrientation(const std::vector<Point> &pts, Mat &img, std::vector<Point
         eigen_val[i] = pca_analysis.eigenvalues.at<double>(0, i);
     }
     // Draw the principal components
-    circle(img, cntr, 3, Scalar(255, 0, 255), 2);
-    Point p1 = cntr + 0.02 * Point(static_cast<int>(eigen_vecs[0].x * eigen_val[0]), static_cast<int>(eigen_vecs[0].y * eigen_val[0]));
-    Point p2 = cntr - 0.02 * Point(static_cast<int>(eigen_vecs[1].x * eigen_val[1]), static_cast<int>(eigen_vecs[1].y * eigen_val[1]));
-    drawAxis(img, cntr, p1, Scalar(0, 255, 0), 1);
-    drawAxis(img, cntr, p2, Scalar(255, 255, 0), 5);
+    // Comenté esto para ya no mostrar los ejes
+    // circle(img, cntr, 3, Scalar(255, 0, 255), 2);
+    // Point p1 = cntr + 0.02 * Point(static_cast<int>(eigen_vecs[0].x * eigen_val[0]), static_cast<int>(eigen_vecs[0].y * eigen_val[0]));
+    // Point p2 = cntr - 0.02 * Point(static_cast<int>(eigen_vecs[1].x * eigen_val[1]), static_cast<int>(eigen_vecs[1].y * eigen_val[1]));
+    // drawAxis(img, cntr, p1, Scalar(0, 255, 0), 1);
+    // drawAxis(img, cntr, p2, Scalar(255, 255, 0), 5);
     double angle = atan2(eigen_vecs[0].y, eigen_vecs[0].x); // orientation in radians
     return angle;
 }
