@@ -205,16 +205,18 @@ void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std
 }
 
 void tallar(const RayT& ray, FloatGrid::Accessor& accessor, tools::VolumeRayIntersector<FloatGrid>& inter) {
-    
     double t0 = 0;    
     double t1 = 0;    
-    inter.march(t0, t1);
-    double step = 0.5;
-    for (double t = t0; t <= t1; t += step) {
-        Vec3T voxel = ray.eye() + ray.dir() * t;
-        openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
-        accessor.setValueOff(coordenada, 2); // 2 es el background value
-    }    
+
+    while (inter.march(t0, t1)) {
+        double step = 0.01;
+        for (double t = t0; t <= t1; t += step) {
+            Vec3T voxel = ray.eye() + ray.dir() * t;
+            openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
+            accessor.setValueOff(coordenada, 2); // 2 es el background value
+        }
+    }
+    
 }
 
 void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGrid::Accessor& accessor, tools::VolumeRayIntersector<FloatGrid>& inter) {
@@ -225,12 +227,15 @@ void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGr
     for (int x = 0; x < l; x++) {
         double alfa = atan(1/d * (l/2 - x));
         for (int y = 0; y < h; y++) {
-            double z = y - h / 2;
-            const Vec3T eye(d*cos(theta)*(1 - tan(alfa)), d*sin(theta)*(1 + tan(alfa)), z);
-            const Vec3T dir = Vec3T(0, 0, z) - eye;
-            const RayT ray(eye, dir); // rayo en index space
-            if (inter.setIndexRay(ray)) {
-                tallar(ray, accessor, inter);
+            if (imagen.at<uchar>(y, x) == 255) {
+                double z = y - h / 2;
+                const Vec3T eye(d*cos(theta)*(1 - tan(alfa)), d*sin(theta)*(1 + tan(alfa)), z);
+
+                const Vec3T dir = Vec3T(-l/2*sin(theta), -l/2*cos(theta), z);
+                const RayT ray(eye, dir); // rayo en index space
+                if (inter.setIndexRay(ray)) {
+                    tallar(ray, accessor, inter);
+                }
             }
         }
     }
@@ -241,7 +246,7 @@ void reconstruccion(std::vector<Mat>& imagenes) {
     openvdb::initialize();
     openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(2.0);
     openvdb::Vec3f centro = openvdb::Vec3f(0,0,0);
-    float arista = 200.0f;
+    float arista = 200.0f; // arbitrario
 
     int dim = int(arista / 2);
     openvdb::Coord ijk; // coordenada que servirá para recorrer el bounding box
@@ -250,7 +255,6 @@ void reconstruccion(std::vector<Mat>& imagenes) {
     int& j = ijk[1];
     int& k = ijk[2];
     auto accessor = grid->getAccessor();
-    tools::VolumeRayIntersector<FloatGrid> inter(*grid);
     for (i = centro[0] - dim; i <= centro[0] + dim; i++) {
         for (j = centro[1] - dim; j <= centro[1] + dim; j++) {
             for (k = centro[2] - dim; k <= centro[2] + dim; k++) {
@@ -258,12 +262,15 @@ void reconstruccion(std::vector<Mat>& imagenes) {
             }
         }
     }
-
+    tools::VolumeRayIntersector<FloatGrid> inter(*grid);
+    
+    debug("Hola");
     // 2. Tallar el cubo
     for (int i = 0; i < imagenes.size(); i++) {
         reconstruccion_por_imagen(i, imagenes.size(), imagenes[i], accessor, inter);
     }
     
+    grid->tree().prune();
     // Metadatos
     grid->insertMeta("arista", openvdb::FloatMetadata(arista));
     openvdb::io::File file("salida.vdb");
@@ -315,9 +322,9 @@ int main() {
     auto it_ini = imagenes_OE2.begin();
     std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 10)); // coger las 10 primeras imágenes por mientras
 
-    previo(imagenes_OE3);
+    // previo(imagenes_OE3);
 
-    //reconstruccion(imagenes_OE3);
+    reconstruccion(imagenes_OE3);
 
 
 }
