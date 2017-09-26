@@ -209,13 +209,21 @@ void tallar(const RayT& ray, FloatGrid::Accessor& accessor, tools::VolumeRayInte
     double t1 = 0;    
 
     while (inter.march(t0, t1)) {
-        double step = 0.0001;
+        double step = 0.01;
         for (double t = t0; t <= t1; t += step) {
             Vec3T voxel = ray.eye() + ray.dir() * t;
             openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
             accessor.setValueOff(coordenada, 2); // 2 es el background value
         }
     }
+
+    // inter.march(t0, t1);
+    // double step = 0.01;
+    // for (double t = t0; t <= t1; t += step) {
+    //     Vec3T voxel = ray.eye() + ray.dir() * t;
+    //     openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
+    //     accessor.setValueOff(coordenada, 2); // 2 es el background value
+    // }
     
 }
 
@@ -224,14 +232,18 @@ void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGr
     double d = 200.0; // arbitrario, debe ser mayor que el lado del cubo entre sqrt(2)
     int l = imagen.rows;
     int h = imagen.cols;
+    debug(l);
+    debug(h);
     for (int x = 0; x < l; x++) {
         double alfa = atan(1/d * (l/2 - x));
         for (int y = 0; y < h; y++) {
             if (imagen.at<uchar>(y, x) == 0) {
                 double z = y - h / 2;
-                const Vec3T eye(d*cos(theta)*(1 - tan(alfa)), d*sin(theta)*(1 + tan(alfa)), z);
+                const Vec3T eye(d*cos(theta) - d*tan(alfa)*sin(theta), d*sin(theta) + d*tan(alfa)*cos(theta), z);
 
-                const Vec3T dir = Vec3T(-l/2*sin(theta), -l/2*cos(theta), z);
+                debug(eye);
+
+                const Vec3T dir = Vec3T(-l/2*sin(theta), -l/2*cos(theta), 0);
                 const RayT ray(eye, dir); // rayo en index space
                 if (inter.setIndexRay(ray)) {
                     tallar(ray, accessor, inter);
@@ -320,7 +332,7 @@ int main() {
 
     // OE3: Reconstrucción
     auto it_ini = imagenes_OE2.begin();
-    std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 8)); // coger las 10 primeras imágenes por mientras
+    std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 1)); // coger las 10 primeras imágenes por mientras
 
     // previo(imagenes_OE3);
 
