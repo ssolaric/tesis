@@ -241,9 +241,9 @@ void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGr
                 double z = y - h / 2;
                 const Vec3T eye(d*cos(theta) - d*tan(alfa)*sin(theta), d*sin(theta) + d*tan(alfa)*cos(theta), z);
 
-                debug(eye);
+                // debug(eye);
 
-                const Vec3T dir = Vec3T(-l/2*sin(theta), -l/2*cos(theta), 0);
+                Vec3T dir = Vec3T(-cos(theta), -sin(theta), 0);
                 const RayT ray(eye, dir); // rayo en index space
                 if (inter.setIndexRay(ray)) {
                     tallar(ray, accessor, inter);
