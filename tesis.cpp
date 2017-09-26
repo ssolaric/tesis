@@ -209,7 +209,7 @@ void tallar(const RayT& ray, FloatGrid::Accessor& accessor, tools::VolumeRayInte
     double t1 = 0;    
 
     while (inter.march(t0, t1)) {
-        double step = 0.01;
+        double step = 0.0001;
         for (double t = t0; t <= t1; t += step) {
             Vec3T voxel = ray.eye() + ray.dir() * t;
             openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
@@ -227,7 +227,7 @@ void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGr
     for (int x = 0; x < l; x++) {
         double alfa = atan(1/d * (l/2 - x));
         for (int y = 0; y < h; y++) {
-            if (imagen.at<uchar>(y, x) == 255) {
+            if (imagen.at<uchar>(y, x) == 0) {
                 double z = y - h / 2;
                 const Vec3T eye(d*cos(theta)*(1 - tan(alfa)), d*sin(theta)*(1 + tan(alfa)), z);
 
@@ -320,7 +320,7 @@ int main() {
 
     // OE3: Reconstrucción
     auto it_ini = imagenes_OE2.begin();
-    std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 10)); // coger las 10 primeras imágenes por mientras
+    std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 8)); // coger las 10 primeras imágenes por mientras
 
     // previo(imagenes_OE3);
 
