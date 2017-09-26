@@ -293,10 +293,14 @@ void reconstruccion(std::vector<Mat>& imagenes) {
 }
 
 void previo(std::vector<Mat>& imagenes) {
+    // for (int i = 0; i < imagenes.size(); i++) {
+    //     std::cout << "Ancho: " << imagenes[i].cols << "\n";
+    //     std::cout << "Altura: " << imagenes[i].rows << "\n";
+    // }
     for (int i = 0; i < imagenes.size(); i++) {
-        std::cout << "Ancho: " << imagenes[i].cols << "\n";
-        std::cout << "Altura: " << imagenes[i].rows << "\n";
+        resize(imagenes[i], imagenes[i], Size(200, 200), 0, 0, INTER_CUBIC);
     }
+
 }
 
 int main() {
@@ -332,9 +336,9 @@ int main() {
 
     // OE3: Reconstrucción
     auto it_ini = imagenes_OE2.begin();
-    std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 1)); // coger las 10 primeras imágenes por mientras
+    std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 10)); // coger las 10 primeras imágenes por mientras
 
-    // previo(imagenes_OE3);
+    previo(imagenes_OE3);
 
     reconstruccion(imagenes_OE3);
 
