@@ -208,22 +208,22 @@ void tallar(const RayT& ray, FloatGrid::Accessor& accessor, tools::VolumeRayInte
     double t0 = 0;    
     double t1 = 0;    
 
-    while (inter.march(t0, t1)) {
-        double step = 0.01;
-        for (double t = t0; t <= t1; t += step) {
-            Vec3T voxel = ray.eye() + ray.dir() * t;
-            openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
-            accessor.setValueOff(coordenada, 2); // 2 es el background value
-        }
-    }
-
-    // inter.march(t0, t1);
-    // double step = 0.01;
-    // for (double t = t0; t <= t1; t += step) {
-    //     Vec3T voxel = ray.eye() + ray.dir() * t;
-    //     openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
-    //     accessor.setValueOff(coordenada, 2); // 2 es el background value
+    // while (inter.march(t0, t1)) {
+    //     double step = 0.01;
+    //     for (double t = t0; t <= t1; t += step) {
+    //         Vec3T voxel = ray.eye() + ray.dir() * t;
+    //         openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
+    //         accessor.setValueOff(coordenada, 2); // 2 es el background value
+    //     }
     // }
+
+    inter.march(t0, t1);
+    double step = 0.01;
+    for (double t = t0; t <= t1; t += step) {
+        Vec3T voxel = ray.eye() + ray.dir() * t;
+        openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
+        accessor.setValueOff(coordenada, 2); // 2 es el background value
+    }
     
 }
 
@@ -252,6 +252,9 @@ void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGr
         }
     }
 }
+
+// todo: probar usar extractActiveVoxelSegmentMasks
+// http://www.openvdb.org/documentation/doxygen/namespaceopenvdb_1_1v4__0__2_1_1tools.html#a3b522dd56a467487d4b16d0f1d16c0d6
 
 void reconstruccion(std::vector<Mat>& imagenes) {
     // 1. Construir el cubo
@@ -282,7 +285,7 @@ void reconstruccion(std::vector<Mat>& imagenes) {
         reconstruccion_por_imagen(i, imagenes.size(), imagenes[i], accessor, inter);
     }
     
-    grid->tree().prune();
+    // grid->tree().prune();
     // Metadatos
     grid->insertMeta("arista", openvdb::FloatMetadata(arista));
     openvdb::io::File file("salida.vdb");
