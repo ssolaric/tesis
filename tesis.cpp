@@ -11,6 +11,7 @@
 #include <opencv2/opencv.hpp>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/RayIntersector.h>
+#include <openvdb/tools/LevelSetUtil.h>
 
 #include "auxiliar.h"
 using namespace cv;
@@ -256,6 +257,32 @@ void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGr
 // todo: probar usar extractActiveVoxelSegmentMasks
 // http://www.openvdb.org/documentation/doxygen/namespaceopenvdb_1_1v4__0__2_1_1tools.html#a3b522dd56a467487d4b16d0f1d16c0d6
 
+// ValueConverter<T>::Type is the type of a tree having the same hierarchy as this tree but a different value type, T.
+template<typename GridOrTreeType>
+void limpiar_escena(GridOrTreeType& volume) {
+    using TreeType = typename TreeAdapter<GridOrTreeType>::TreeType;
+    using TreePtrType = typename TreeType::Ptr;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolTreePtrType = typename BoolTreeType::Ptr;
+    // 1. Hallar componentes conexos
+    const TreeType& inputTree = TreeAdapter<GridOrTreeType>::tree(volume);
+
+    std::vector<BoolTreePtrType> maskSegmentArray;
+    // static_assert(decltype(maskSegmentArray)::dummy_error, "AAAAAA");
+    
+    tools::extractActiveVoxelSegmentMasks(inputTree, maskSegmentArray);
+
+    const size_t num_segments = maskSegmentArray.size();
+    for (int i = 0; i < num_segments; i++) {
+        
+    }
+}
+
+// void limpiar_escena(FloatGrid& grid) {
+//     // pasarlo a árbol
+//     using TreeType = typename TreeAdapter<FloatGrid>::TreeType;
+// }
+
 void reconstruccion(std::vector<Mat>& imagenes) {
     // 1. Construir el cubo
     openvdb::initialize();
@@ -284,6 +311,9 @@ void reconstruccion(std::vector<Mat>& imagenes) {
     for (int i = 0; i < imagenes.size(); i++) {
         reconstruccion_por_imagen(i, imagenes.size(), imagenes[i], accessor, inter);
     }
+
+    // 3. Limpiar la escena
+    limpiar_escena(*grid);
     
     // grid->tree().prune();
     // Metadatos
@@ -341,9 +371,8 @@ int main() {
     auto it_ini = imagenes_OE2.begin();
     std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 10)); // coger las 10 primeras imágenes por mientras
 
-    previo(imagenes_OE3);
+    // ya no hago resize, que se quede comentada la siguiente línea
+    // previo(imagenes_OE3);
 
     reconstruccion(imagenes_OE3);
-
-
 }
