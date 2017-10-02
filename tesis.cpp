@@ -259,23 +259,23 @@ void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGr
 
 // ValueConverter<T>::Type is the type of a tree having the same hierarchy as this tree but a different value type, T.
 template<typename GridOrTreeType>
-void limpiar_escena(GridOrTreeType& volume) {
-    using TreeType = typename TreeAdapter<GridOrTreeType>::TreeType;
-    using TreePtrType = typename TreeType::Ptr;
-    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
-    using BoolTreePtrType = typename BoolTreeType::Ptr;
+typename GridOrTreeType::Ptr limpiar_escena(GridOrTreeType& volume) {
     // 1. Hallar componentes conexos
-    const TreeType& inputTree = TreeAdapter<GridOrTreeType>::tree(volume);
+    std::vector<typename GridOrTreeType::Ptr> segments;
+    tools::segmentActiveVoxels(volume, segments);
+    // separa el grid en varios grids o árboles distintos
+    // segments: vector de árboles o grids ordenados en orden descendiente de vóxeles activos
 
-    std::vector<BoolTreePtrType> maskSegmentArray;
-    // static_assert(decltype(maskSegmentArray)::dummy_error, "AAAAAA");
-    
-    tools::extractActiveVoxelSegmentMasks(inputTree, maskSegmentArray);
-
-    const size_t num_segments = maskSegmentArray.size();
+    // necesito quedarme con el árbol o grid que contenga el vóxel de coordenadas (0, 0, 0)
+    const size_t num_segments = segments.size();
     for (int i = 0; i < num_segments; i++) {
-        
+        auto accessor = segments[i]->getAccessor();
+        if (accessor.isValueOn(Coord(0, 0, 0))) {
+            // lo encontré, siempre lo encontrará
+            return segments[i];
+        }
     }
+    // return GridOrTreeType::Ptr();
 }
 
 // void limpiar_escena(FloatGrid& grid) {
@@ -313,14 +313,15 @@ void reconstruccion(std::vector<Mat>& imagenes) {
     }
 
     // 3. Limpiar la escena
-    limpiar_escena(*grid);
+    openvdb::FloatGrid::Ptr espermatozoide = limpiar_escena(*grid);
+
     
     // grid->tree().prune();
     // Metadatos
-    grid->insertMeta("arista", openvdb::FloatMetadata(arista));
+    espermatozoide->insertMeta("arista", openvdb::FloatMetadata(arista));
     openvdb::io::File file("salida.vdb");
     openvdb::GridPtrVec grids;
-    grids.push_back(grid);
+    grids.push_back(espermatozoide);
     file.write(grids);
     file.close();
 }
