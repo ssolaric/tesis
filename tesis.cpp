@@ -1,5 +1,6 @@
 #define debug(x) do { std::cout << #x << ": " << x << "\n"; } while (0)
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <cmath>
 #include <string>
@@ -10,13 +11,15 @@
 
 #include <opencv2/opencv.hpp>
 #include <openvdb/openvdb.h>
+#include <openvdb/Types.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/VolumeToMesh.h>
 
 #include "auxiliar.h"
 using namespace cv;
 using namespace openvdb;
-typedef math::Ray<double>  RayT;
+typedef math::Ray<double> RayT;
 typedef RayT::Vec3Type Vec3T;
 
 void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<Mat>& imagenes) {
@@ -223,7 +226,7 @@ void tallar(const RayT& ray, FloatGrid::Accessor& accessor, tools::VolumeRayInte
     for (double t = t0; t <= t1; t += step) {
         Vec3T voxel = ray.eye() + ray.dir() * t;
         openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
-        accessor.setValueOff(coordenada, 2); // 2 es el background value
+        accessor.setValueOff(coordenada, 1); // 2 es el background value
     }
     
 }
@@ -254,17 +257,15 @@ void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGr
     }
 }
 
-// todo: probar usar extractActiveVoxelSegmentMasks
-// http://www.openvdb.org/documentation/doxygen/namespaceopenvdb_1_1v4__0__2_1_1tools.html#a3b522dd56a467487d4b16d0f1d16c0d6
+// http://www.openvdb.org/documentation/doxygen/namespaceopenvdb_1_1v4__0__2_1_1tools.html#a1cc2d4f60d561afd2fb248e386ca67d8
 
-// ValueConverter<T>::Type is the type of a tree having the same hierarchy as this tree but a different value type, T.
 template<typename GridOrTreeType>
 typename GridOrTreeType::Ptr limpiar_escena(GridOrTreeType& volume) {
-    // 1. Hallar componentes conexos
     std::vector<typename GridOrTreeType::Ptr> segments;
-    tools::segmentActiveVoxels(volume, segments);
+    
     // separa el grid en varios grids o árboles distintos
     // segments: vector de árboles o grids ordenados en orden descendiente de vóxeles activos
+    tools::segmentActiveVoxels(volume, segments);
 
     // necesito quedarme con el árbol o grid que contenga el vóxel de coordenadas (0, 0, 0)
     const size_t num_segments = segments.size();
@@ -278,35 +279,29 @@ typename GridOrTreeType::Ptr limpiar_escena(GridOrTreeType& volume) {
     // return GridOrTreeType::Ptr();
 }
 
-// void limpiar_escena(FloatGrid& grid) {
-//     // pasarlo a árbol
-//     using TreeType = typename TreeAdapter<FloatGrid>::TreeType;
-// }
+void guardar_malla(const std::vector<openvdb::Vec3s>& puntos, const std::vector<openvdb::Vec4I>& cuadrilateros) {
+    std::ofstream archivo("malla.off");
+    archivo << "OFF\n";
+    archivo << puntos.size() << " " << cuadrilateros.size() << " 0\n";
+    for (int i = 0; i < puntos.size(); i++) {
+        archivo << puntos[i].x() << " " << puntos[i].y() << " " << puntos[i].z() << "\n";
+    }
 
+    for (int i = 0; i < cuadrilateros.size(); i++) {
+        archivo << "4 " << cuadrilateros[i].x() << " " << cuadrilateros[i].y() << " " << cuadrilateros[i].z() << " " << cuadrilateros[i].w() << "\n";
+    }
+}
+
+// en meshlab: si el objeto sale opaco, invertir las normales de los triángulos
 void reconstruccion(std::vector<Mat>& imagenes) {
     // 1. Construir el cubo
     openvdb::initialize();
-    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(2.0);
-    openvdb::Vec3f centro = openvdb::Vec3f(0,0,0);
-    float arista = 200.0f; // arbitrario
+    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(1); // 1 es el background value
+    CoordBBox caja(Coord(-100, -100, -100), Coord(100, 100, 100));
+    grid->fill(caja, -1); // -1 es el valor de un voxel activo (ya no se mostrará en el vdb_view)
 
-    int dim = int(arista / 2);
-    openvdb::Coord ijk; // coordenada que servirá para recorrer el bounding box
-    // Hacer que estos índices i, j y k referencien a la coordenada que usamos para recorrer.
-    int& i = ijk[0];
-    int& j = ijk[1];
-    int& k = ijk[2];
     auto accessor = grid->getAccessor();
-    for (i = centro[0] - dim; i <= centro[0] + dim; i++) {
-        for (j = centro[1] - dim; j <= centro[1] + dim; j++) {
-            for (k = centro[2] - dim; k <= centro[2] + dim; k++) {
-                accessor.setValue(ijk, 0);
-            }
-        }
-    }
-    tools::VolumeRayIntersector<FloatGrid> inter(*grid);
-    
-    debug("Hola");
+    tools::VolumeRayIntersector<FloatGrid> inter(*grid);    
     // 2. Tallar el cubo
     for (int i = 0; i < imagenes.size(); i++) {
         reconstruccion_por_imagen(i, imagenes.size(), imagenes[i], accessor, inter);
@@ -315,15 +310,16 @@ void reconstruccion(std::vector<Mat>& imagenes) {
     // 3. Limpiar la escena
     openvdb::FloatGrid::Ptr espermatozoide = limpiar_escena(*grid);
 
-    
-    // grid->tree().prune();
-    // Metadatos
-    espermatozoide->insertMeta("arista", openvdb::FloatMetadata(arista));
-    openvdb::io::File file("salida.vdb");
-    openvdb::GridPtrVec grids;
-    grids.push_back(espermatozoide);
-    file.write(grids);
-    file.close();
+    // 4. Pasarla a malla.
+    // Así ya no tendría que usar el visor del openvdb.
+    std::vector<openvdb::Vec3s> puntos;
+    std::vector<openvdb::Vec4I> cuadrilateros;
+    tools::volumeToMesh(*espermatozoide, puntos, cuadrilateros);
+    debug(puntos.size());
+    debug(cuadrilateros.size());
+    // puedo guardarlo como malla cuadrangular
+    // off con 4 como número de lados
+    guardar_malla(puntos, cuadrilateros);
 }
 
 void previo(std::vector<Mat>& imagenes) {
