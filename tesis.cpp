@@ -17,12 +17,13 @@
 #include <openvdb/tools/VolumeToMesh.h>
 
 #include "auxiliar.h"
-using namespace cv;
-using namespace openvdb;
-typedef math::Ray<double> RayT;
+
+typedef openvdb::math::Ray<double> RayT;
 typedef RayT::Vec3Type Vec3T;
 
-void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<Mat>& imagenes) {
+const int BACKGROUND_VALUE = 1;
+
+void leerImagenes(std::vector<std::string>& nombresImagenes, std::vector<cv::Mat>& imagenes) {
     struct dirent** namelist;
     int n = scandir("./Imagenes", &namelist, NULL, versionsort);
     if (n < 0) {
@@ -31,15 +32,15 @@ void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<Mat>&
     else {
         for (int i = 0; i < n; i++) {
             std::string nombre(namelist[i]->d_name);
-            auto ind_extension = nombre.find(".jpg");
-            if (ind_extension != std::string::npos) {
+            auto indExtension = nombre.find(".jpg");
+            if (indExtension != std::string::npos) {
                 std::string ruta = std::string("./Imagenes/") + nombre;
-                Mat imagen = imread(ruta);
+                cv::Mat imagen = cv::imread(ruta);
                 if (imagen.empty()) continue;
-                nombre.erase(ind_extension);
+                nombre.erase(indExtension);
                 nombre += ".png";
                 imagenes.push_back(imagen);
-                nombres_imagenes.push_back(nombre);
+                nombresImagenes.push_back(nombre);
             }
             free(namelist[i]);
         }
@@ -47,82 +48,79 @@ void leer_imagenes(std::vector<std::string>& nombres_imagenes, std::vector<Mat>&
     }
 }
 
-Mat quitar_margen(const Mat& imagen, int margen) {
-    Mat nueva(imagen.rows - 2*margen, imagen.cols - 2*margen, imagen.type());
+cv::Mat quitarMargen(const cv::Mat& imagen, int margen) {
+    cv::Mat nueva(imagen.rows - 2*margen, imagen.cols - 2*margen, imagen.type());
     for (int r = margen; r < imagen.rows - margen; r++) {
         for (int c = margen; c < imagen.cols - margen; c++) {
-            nueva.at<Vec3b>(r-margen, c-margen) = imagen.at<Vec3b>(r, c);
+            nueva.at<cv::Vec3b>(r-margen, c-margen) = imagen.at<cv::Vec3b>(r, c);
         }
     }
     return nueva;
 }
 
-void binarizacion(Mat& imagen, const std::string& nombre_imagen) {
+void binarizacion(cv::Mat& imagen, const std::string& nombreImagen) {
 
     imagen = equalizeIntensity(imagen); // ecualización del canal de intensidad 
     double spatialWindowRadius = 2; // sp
     double colorWindowRadius = 5; // sr
 
     // 1. Aplicar Mean Shift a la imagen a color.
-    pyrMeanShiftFiltering(imagen, imagen, spatialWindowRadius, colorWindowRadius);
+    cv::pyrMeanShiftFiltering(imagen, imagen, spatialWindowRadius, colorWindowRadius);
 
     // 2. Aplicar Gaussian Blur a la imagen en escala de grises.
-    cvtColor(imagen, imagen, COLOR_BGR2GRAY);
+    cv::cvtColor(imagen, imagen, cv::COLOR_BGR2GRAY);
     for (int j = 1; j < 11; j += 2) {
-        GaussianBlur(imagen, imagen, Size(j, j), 0);
+        cv::GaussianBlur(imagen, imagen, cv::Size(j, j), 0);
     }
     
     // 3. Hacer un resize
-    resize(imagen, imagen, Size(0, 0), 8.0, 8.0, INTER_CUBIC);
+    cv::resize(imagen, imagen, cv::Size(0, 0), 8.0, 8.0, cv::INTER_CUBIC);
 
     // 4. Aumentar el contraste
-    equalizeHist(imagen, imagen);
+    cv::equalizeHist(imagen, imagen);
 
     // 5. Hacer el threshold
     // El área oscura dentro de un espermatozoide (los píxeles entre 0 y 2) es la parte inferior de la cabeza (cercana a la cola).
     // No funciona bien con la imagen 14 (posible opción: descartarla)
-    // inRange(imagen, Scalar(3), Scalar(25), imagen);
-    inRange(imagen, Scalar(0), Scalar(25), imagen);
-    bitwise_not(imagen, imagen);
+    // inRange(imagen, cv::Scalar(3), cv::Scalar(25), imagen);
+    cv::inRange(imagen, cv::Scalar(0), cv::Scalar(25), imagen);
+    cv::bitwise_not(imagen, imagen);
 
-    std::string ruta = std::string("./ImagenesBinarizadas/") + nombre_imagen;
-    imwrite(ruta, imagen);
+    std::string ruta = std::string("./ImagenesBinarizadas/") + nombreImagen;
+    cv::imwrite(ruta, imagen);
 }
 
 // https://stackoverflow.com/a/8467129
-void contorno(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours) {
-    // Mat contourOutput = imagen.clone();
-    findContours(imagen, contours, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
+void contorno(cv::Mat& imagen, const std::string& nombreImagen, std::vector<std::vector<cv::Point> >& contours) {
+    // cv::Mat contourOutput = imagen.clone();
+    cv::findContours(imagen, contours, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
 
     //Draw the contours
-    Mat contourImage(imagen.size(), CV_8UC3, Scalar(0,0,0));
-    Scalar colors[3];
-    colors[0] = Scalar(255, 0, 0);
-    colors[1] = Scalar(0, 255, 0);
-    colors[2] = Scalar(0, 0, 255);
-    // for (size_t i = 0; i < contours.size(); i++) {
-    //     drawContours(contourImage, contours, i, colors[idx % 3]); // dibuja en contourImage el contorno contours[i]
-    // }
-    drawContours(contourImage, contours, -1, colors[1]);
+    cv::Mat contourImage(imagen.size(), CV_8UC3, cv::Scalar(0,0,0));
+    cv::Scalar colors[3];
+    colors[0] = cv::Scalar(255, 0, 0);
+    colors[1] = cv::Scalar(0, 255, 0);
+    colors[2] = cv::Scalar(0, 0, 255);
+    cv::drawContours(contourImage, contours, -1, colors[1]);
 
-    std::string ruta = std::string("./Contornos/") + nombre_imagen;
-    imwrite(ruta, contourImage);
+    std::string ruta = std::string("./Contornos/") + nombreImagen;
+    cv::imwrite(ruta, contourImage);
 }
 
 // Retorna true si hay que eliminar la imagen, false en caso contrario.
-bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::vector<Point> >& contours, int& contorno_cabeza) {
+bool deteccion(cv::Mat& imagen, const std::string& nombreImagen, std::vector<std::vector<cv::Point> >& contours, int& contornoCabeza) {
     // Para extraer la región de la cabeza, necesito sacar el contorno con segunda mayor área, pero que esta área sea mayor que un valor determinado y que cumpla la forma ovalada.
     /*
     Casos:
-    1. num_contours == 1: se descartan estas imágenes porque las cabezas están en los extremos
+    1. numContours == 1: se descartan estas imágenes porque las cabezas están en los extremos
 
     En los siguientes casos se establece un threshold de área = 5000.
-    2. num_contours == 2: se obtiene el contorno con segunda mayor área, que debe tener 
-    como mínimo area_threshold de área.
-    3. num_contours > 2: se obtiene el contorno con segunda mayor área, que debe tener 
-    como mínimo el mayor área entre area_threshold y el área del contorno con tercera mayor área. 
+    2. numContours == 2: se obtiene el contorno con segunda mayor área, que debe tener 
+    como mínimo areaThreshold de área.
+    3. numContours > 2: se obtiene el contorno con segunda mayor área, que debe tener 
+    como mínimo el mayor área entre areaThreshold y el área del contorno con tercera mayor área. 
     */
-    SimpleBlobDetector::Params params;
+    cv::SimpleBlobDetector::Params params;
 
     // params.filterByCircularity = true;
     // params.minCircularity = 0.5;
@@ -130,20 +128,20 @@ bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
     double mayorArea = 0.0;
     double menorArea = 1e9;
 
-    int num_contours = contours.size();
-    if (num_contours == 1) return true; // Ignorar las cabezas en los extremos
+    int numContours = contours.size();
+    if (numContours == 1) return true; // Ignorar las cabezas en los extremos
 
-    std::sort(contours.begin(), contours.end(), ordenar_por_area);
+    std::sort(contours.begin(), contours.end(), ordenarPorArea);
 
-    double area_threshold = 5000.0;
+    double areaThreshold = 5000.0;
     params.filterByArea = true;
-    if (num_contours > 2) {
-        params.minArea = std::max(contourArea(contours[num_contours-3]) + 1, area_threshold);
+    if (numContours > 2) {
+        params.minArea = std::max(cv::contourArea(contours[numContours-3]) + 1, areaThreshold);
     }
     else {
-        params.minArea = area_threshold;
+        params.minArea = areaThreshold;
     }
-    params.maxArea = contourArea(contours[num_contours-2]) + 10;
+    params.maxArea = cv::contourArea(contours[numContours-2]) + 10;
 
     params.filterByConvexity = true;
     params.minConvexity = 0.1;
@@ -151,36 +149,36 @@ bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
     params.filterByInertia = true;
     params.minInertiaRatio = 0.1;
 
-    Ptr<SimpleBlobDetector> detector = SimpleBlobDetector::create(params);
+    cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
 
-    Mat contourImage(imagen.size(), CV_8UC1, Scalar(0));
-    drawContours(contourImage, contours, -1, Scalar(255));
+    cv::Mat contourImage(imagen.size(), CV_8UC1, cv::Scalar(0));
+    cv::drawContours(contourImage, contours, -1, cv::Scalar(255));
     
-    std::vector<KeyPoint> keypoints;
+    std::vector<cv::KeyPoint> keypoints;
     detector->detect(contourImage, keypoints);
 
     // Si encontré un solo keypoint, busco la región que contiene a este punto. Esta región es la cabeza del espermatozoide.
     // https://stackoverflow.com/a/30810250
     if (keypoints.size() == 1) {
-        Mat imagen_con_keypoints;
-        drawKeypoints(contourImage, keypoints, imagen_con_keypoints, Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        cv::Mat imagenConKeypoints;
+        drawKeypoints(contourImage, keypoints, imagenConKeypoints, cv::Scalar(0, 0, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-        Point2f punto_central = keypoints[0].pt;
+        cv::Point2f puntoCentral = keypoints[0].pt;
         
         for (int i = 0; i < contours.size(); i++) {
-            int dentro = pointPolygonTest(contours[i], punto_central, false);
+            int dentro = pointPolygonTest(contours[i], puntoCentral, false);
             if (dentro == 1) {
                 // encontré el contorno necesario
-                contorno_cabeza = i;
+                contornoCabeza = i;
                 break;
             }
         }
 
         // Grafico la región del keypoint enocntrado
-        Mat imagenFinal(imagen.size(), CV_8UC1, Scalar(0));
-        drawContours(imagenFinal, contours, contorno_cabeza, Scalar(255), -1);
-        std::string ruta = std::string("./Blobs/") + nombre_imagen;
-        imwrite(ruta, imagenFinal);
+        cv::Mat imagenFinal(imagen.size(), CV_8UC1, cv::Scalar(0));
+        cv::drawContours(imagenFinal, contours, contornoCabeza, cv::Scalar(255), -1);
+        std::string ruta = std::string("./Blobs/") + nombreImagen;
+        cv::imwrite(ruta, imagenFinal);
 
         // guardar la imagen creada
         imagen = imagenFinal;
@@ -191,24 +189,24 @@ bool deteccion(Mat& imagen, const std::string& nombre_imagen, std::vector<std::v
     }
 }
 
-void normalizacion_pose(Mat& imagen, const std::string& nombre_imagen, const std::vector<Point>& contorno) {
-    Rect rectangulo = boundingRect(contorno);
-    // rectangle(imagen, rectangulo, Scalar(255));
+void normalizacionDePose(cv::Mat& imagen, const std::string& nombreImagen, const std::vector<cv::Point>& contorno) {
+    cv::Rect rectangulo = cv::boundingRect(contorno);
+    // cv::rectangle(imagen, rectangulo, cv::Scalar(255));
     // https://stackoverflow.com/a/8110695
-    Mat roi = Mat(imagen, rectangulo).clone();
+    cv::Mat roi = cv::Mat(imagen, rectangulo).clone();
 
     double angulo = getOrientation(contorno, imagen); // en radianes
     angulo = angulo*180.0/CV_PI; // pasar a grados
-    rotar_imagen(roi, angulo); // ángulo en grados
+    rotarImagen(roi, angulo); // ángulo en grados
 
     imagen = roi;
 
-    std::string ruta = std::string("./NormalizadasSinEjes/") + nombre_imagen;
-    // imwrite(ruta, imagen);
-    imwrite(ruta, roi);
+    std::string ruta = std::string("./NormalizadasSinEjes/") + nombreImagen;
+    // cv::imwrite(ruta, imagen);
+    cv::imwrite(ruta, roi);
 }
 
-void tallar(const RayT& ray, FloatGrid::Accessor& accessor, tools::VolumeRayIntersector<FloatGrid>& inter) {
+void tallar(const RayT& ray, openvdb::FloatGrid::Accessor& accessor, openvdb::tools::VolumeRayIntersector<openvdb::FloatGrid>& inter) {
     double t0 = 0;    
     double t1 = 0;    
 
@@ -217,7 +215,7 @@ void tallar(const RayT& ray, FloatGrid::Accessor& accessor, tools::VolumeRayInte
     //     for (double t = t0; t <= t1; t += step) {
     //         Vec3T voxel = ray.eye() + ray.dir() * t;
     //         openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
-    //         accessor.setValueOff(coordenada, 2); // 2 es el background value
+    //         accessor.setValueOff(coordenada, BACKGROUND_VALUE);
     //     }
     // }
 
@@ -226,12 +224,12 @@ void tallar(const RayT& ray, FloatGrid::Accessor& accessor, tools::VolumeRayInte
     for (double t = t0; t <= t1; t += step) {
         Vec3T voxel = ray.eye() + ray.dir() * t;
         openvdb::Coord coordenada(voxel.x(), voxel.y(), voxel.z());
-        accessor.setValueOff(coordenada, 1); // 2 es el background value
+        accessor.setValueOff(coordenada, BACKGROUND_VALUE);
     }
     
 }
 
-void reconstruccion_por_imagen(int orden, int num_imagenes, Mat& imagen, FloatGrid::Accessor& accessor, tools::VolumeRayIntersector<FloatGrid>& inter) {
+void reconstruccion_por_imagen(int orden, int num_imagenes, cv::Mat& imagen, openvdb::FloatGrid::Accessor& accessor, openvdb::tools::VolumeRayIntersector<openvdb::FloatGrid>& inter) {
     double theta = orden * 2*CV_PI / num_imagenes;
     double d = 200.0; // arbitrario, debe ser mayor que el lado del cubo entre sqrt(2)
     int l = imagen.rows;
@@ -265,13 +263,13 @@ typename GridOrTreeType::Ptr limpiar_escena(GridOrTreeType& volume) {
     
     // separa el grid en varios grids o árboles distintos
     // segments: vector de árboles o grids ordenados en orden descendiente de vóxeles activos
-    tools::segmentActiveVoxels(volume, segments);
+    openvdb::tools::segmentActiveVoxels(volume, segments);
 
     // necesito quedarme con el árbol o grid que contenga el vóxel de coordenadas (0, 0, 0)
     const size_t num_segments = segments.size();
     for (int i = 0; i < num_segments; i++) {
         auto accessor = segments[i]->getAccessor();
-        if (accessor.isValueOn(Coord(0, 0, 0))) {
+        if (accessor.isValueOn(openvdb::Coord(0, 0, 0))) {
             // lo encontré, siempre lo encontrará
             return segments[i];
         }
@@ -293,15 +291,15 @@ void guardar_malla(const std::vector<openvdb::Vec3s>& puntos, const std::vector<
 }
 
 // en meshlab: si el objeto sale opaco, invertir las normales de los triángulos
-void reconstruccion(std::vector<Mat>& imagenes) {
+void reconstruccion(std::vector<cv::Mat>& imagenes) {
     // 1. Construir el cubo
     openvdb::initialize();
-    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(1); // 1 es el background value
-    CoordBBox caja(Coord(-100, -100, -100), Coord(100, 100, 100));
+    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(BACKGROUND_VALUE); // 1 es el background value
+    openvdb::CoordBBox caja(openvdb::Coord(-100, -100, -100), openvdb::Coord(100, 100, 100));
     grid->fill(caja, -1); // -1 es el valor de un voxel activo (ya no se mostrará en el vdb_view)
 
     auto accessor = grid->getAccessor();
-    tools::VolumeRayIntersector<FloatGrid> inter(*grid);    
+    openvdb::tools::VolumeRayIntersector<openvdb::FloatGrid> inter(*grid);    
     // 2. Tallar el cubo
     for (int i = 0; i < imagenes.size(); i++) {
         reconstruccion_por_imagen(i, imagenes.size(), imagenes[i], accessor, inter);
@@ -314,62 +312,45 @@ void reconstruccion(std::vector<Mat>& imagenes) {
     // Así ya no tendría que usar el visor del openvdb.
     std::vector<openvdb::Vec3s> puntos;
     std::vector<openvdb::Vec4I> cuadrilateros;
-    tools::volumeToMesh(*espermatozoide, puntos, cuadrilateros);
+    openvdb::tools::volumeToMesh(*espermatozoide, puntos, cuadrilateros);
     debug(puntos.size());
     debug(cuadrilateros.size());
-    // puedo guardarlo como malla cuadrangular
-    // off con 4 como número de lados
     guardar_malla(puntos, cuadrilateros);
 }
 
-void previo(std::vector<Mat>& imagenes) {
-    // for (int i = 0; i < imagenes.size(); i++) {
-    //     std::cout << "Ancho: " << imagenes[i].cols << "\n";
-    //     std::cout << "Altura: " << imagenes[i].rows << "\n";
-    // }
-    for (int i = 0; i < imagenes.size(); i++) {
-        resize(imagenes[i], imagenes[i], Size(200, 200), 0, 0, INTER_CUBIC);
-    }
-
-}
-
 int main() {
-    std::vector<std::string> nombresImagenes_OE1;
-    std::vector<Mat> imagenes_OE1;
-    leer_imagenes(nombresImagenes_OE1, imagenes_OE1);
-    std::vector<std::vector<Point> > contornos_OE1;
+    std::vector<std::string> nombresImagenesOE1;
+    std::vector<cv::Mat> imagenesOE1;
+    leerImagenes(nombresImagenesOE1, imagenesOE1);
+    std::vector<std::vector<cv::Point>> contornosOE1;
 
-    std::vector<std::string> nombresImagenes_OE2;
-    std::vector<Mat> imagenes_OE2;
-    std::vector<std::vector<Point> > contornos_OE2;
+    std::vector<std::string> nombresImagenesOE2;
+    std::vector<cv::Mat> imagenesOE2;
+    std::vector<std::vector<cv::Point>> contornosOE2;
     
     // OE1: Mejora de contraste y segmentación
-    for (size_t i = 0; i < imagenes_OE1.size(); i++) {
-        imagenes_OE1[i] = quitar_margen(imagenes_OE1[i], 4);
-        binarizacion(imagenes_OE1[i], nombresImagenes_OE1[i]);
-        contorno(imagenes_OE1[i], nombresImagenes_OE1[i], contornos_OE1);
-        int ind_contorno = 0;
-        bool eliminar_imagen = deteccion(imagenes_OE1[i], nombresImagenes_OE1[i], contornos_OE1, ind_contorno);
+    for (size_t i = 0; i < imagenesOE1.size(); i++) {
+        imagenesOE1[i] = quitarMargen(imagenesOE1[i], 4);
+        binarizacion(imagenesOE1[i], nombresImagenesOE1[i]);
+        contorno(imagenesOE1[i], nombresImagenesOE1[i], contornosOE1);
+        int indContorno = 0;
+        bool eliminarImagen = deteccion(imagenesOE1[i], nombresImagenesOE1[i], contornosOE1, indContorno);
 
-        if (!eliminar_imagen) {
-            imagenes_OE2.push_back(imagenes_OE1[i].clone());
-            nombresImagenes_OE2.push_back(nombresImagenes_OE1[i]);
-            contornos_OE2.push_back(contornos_OE1[ind_contorno]);
+        if (!eliminarImagen) {
+            imagenesOE2.push_back(imagenesOE1[i].clone());
+            nombresImagenesOE2.push_back(nombresImagenesOE1[i]);
+            contornosOE2.push_back(contornosOE1[indContorno]);
         }
 
     }
 
     // OE2: Normalización de pose
-    for (size_t i = 0; i < imagenes_OE2.size(); i++) {
-        normalizacion_pose(imagenes_OE2[i], nombresImagenes_OE2[i], contornos_OE2[i]);
+    for (size_t i = 0; i < imagenesOE2.size(); i++) {
+        normalizacionDePose(imagenesOE2[i], nombresImagenesOE2[i], contornosOE2[i]);
     }
 
     // OE3: Reconstrucción
-    auto it_ini = imagenes_OE2.begin();
-    std::vector<Mat> imagenes_OE3(it_ini, std::next(it_ini, 10)); // coger las 10 primeras imágenes por mientras
-
-    // ya no hago resize, que se quede comentada la siguiente línea
-    // previo(imagenes_OE3);
-
-    reconstruccion(imagenes_OE3);
+    auto itIni = imagenesOE2.begin();
+    std::vector<cv::Mat> imagenesOE3(itIni, itIni + 10); // coger las 10 primeras imágenes por mientras
+    reconstruccion(imagenesOE3);
 }
