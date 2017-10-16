@@ -42,3 +42,53 @@ Parametrización del algoritmo. Necesito:
 - Nombre de la carpeta en donde se guardan las imágenes normalizadas.
 * step usado para el space carving
 * nombre de la malla de salida
+
+step = 0.01
+Pruebas con varias imágenes:
+1. 15 imágenes
+puntos.size(): 47992
+cuadrilateros.size(): 47992
+
+real	20m43.004s
+user	20m44.052s
+sys	0m0.940s
+
+2. 20 imágenes
+puntos.size(): 40380
+cuadrilateros.size(): 40378
+
+real	20m43.004s
+user	20m44.052s
+sys	0m0.940s
+
+3. 25
+puntos.size(): 37632
+cuadrilateros.size(): 37630
+
+real	25m35.719s
+user	25m36.764s
+sys	0m0.920s
+
+4. 30
+puntos.size(): 36840
+cuadrilateros.size(): 36838
+
+real	29m43.081s
+user	29m43.708s
+sys	0m1.140s
+
+5. 35
+puntos.size(): 32222
+cuadrilateros.size(): 32220
+
+real	32m16.839s
+user	32m17.752s
+sys	0m0.928s
+
+6. 40
+puntos.size(): 29814
+cuadrilateros.size(): 29812
+
+real	36m32.507s
+user	36m32.428s
+sys	0m1.352s
