@@ -1,0 +1,16 @@
+n: 102
+Se procesarán las imágenes de la carpeta ImagenesReconstruccion.
+n: 70
+numImagenesReconstruccion: 5
+l: 124
+h: 157
+l: 122
+h: 157
+l: 102
+h: 141
+l: 157
+h: 169
+l: 171
+h: 171
+puntos.size(): 65846
+cuadrilateros.size(): 65844

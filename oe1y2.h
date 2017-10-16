@@ -6,25 +6,46 @@
 #include <stdlib.h>
 
 #include <opencv2/opencv.hpp>
+#define debug(x) do { std::cout << #x << ": " << x << "\n"; } while (0)
 
-void leerImagenes(std::vector<std::string>& nombresImagenes, std::vector<cv::Mat>& imagenes) {
+
+void leerImagenes(std::vector<std::string>& nombresImagenes, std::vector<cv::Mat>& imagenes, bool manual = false) {
     struct dirent** namelist;
-    int n = scandir("./Imagenes", &namelist, NULL, versionsort);
+    int n;
+    if (manual) {
+        n = scandir("./ImagenesReconstruccion", &namelist, NULL, versionsort);
+    }
+    else {
+        n = scandir("./Imagenes", &namelist, NULL, versionsort);        
+    }
     if (n < 0) {
         perror("scandir");
     }
     else {
+        debug(n);
         for (int i = 0; i < n; i++) {
             std::string nombre(namelist[i]->d_name);
-            auto indExtension = nombre.find(".jpg");
-            if (indExtension != std::string::npos) {
-                std::string ruta = std::string("./Imagenes/") + nombre;
-                cv::Mat imagen = cv::imread(ruta);
-                if (imagen.empty()) continue;
-                nombre.erase(indExtension);
-                nombre += ".png";
-                imagenes.push_back(imagen);
-                nombresImagenes.push_back(nombre);
+            if (!manual) {
+                auto indExtension = nombre.find(".jpg");
+                if (indExtension != std::string::npos) {
+                    std::string ruta = std::string("./Imagenes/") + nombre;
+                    cv::Mat imagen = cv::imread(ruta);
+                    if (imagen.empty()) continue;
+                    nombre.erase(indExtension);
+                    nombre += ".png";
+                    imagenes.push_back(imagen);
+                    nombresImagenes.push_back(nombre);
+                }
+            }
+            else {
+                auto indExtension = nombre.find(".png");
+                if (indExtension != std::string::npos) {
+                    std::string ruta = std::string("./ImagenesReconstruccion/") + nombre;
+                    cv::Mat imagen = cv::imread(ruta, 0);
+                    if (imagen.empty()) continue;
+                    imagenes.push_back(imagen);
+                    nombresImagenes.push_back(nombre);
+                }
             }
             free(namelist[i]);
         }
@@ -145,12 +166,12 @@ bool deteccion(cv::Mat& imagen, const std::string& nombreImagen, std::vector<std
     // https://stackoverflow.com/a/30810250
     if (keypoints.size() == 1) {
         cv::Mat imagenConKeypoints;
-        drawKeypoints(contourImage, keypoints, imagenConKeypoints, cv::Scalar(0, 0, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        cv::drawKeypoints(contourImage, keypoints, imagenConKeypoints, cv::Scalar(0, 0, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
         cv::Point2f puntoCentral = keypoints[0].pt;
         
         for (int i = 0; i < contours.size(); i++) {
-            int dentro = pointPolygonTest(contours[i], puntoCentral, false);
+            int dentro = cv::pointPolygonTest(contours[i], puntoCentral, false);
             if (dentro == 1) {
                 // encontré el contorno necesario
                 contornoCabeza = i;
@@ -183,9 +204,9 @@ void normalizacionDePose(cv::Mat& imagen, const std::string& nombreImagen, const
     angulo = angulo*180.0/CV_PI; // pasar a grados
     rotarImagen(roi, angulo); // ángulo en grados
 
-    imagen = roi;
-
-    std::string ruta = std::string("./NormalizadasSinEjes/") + nombreImagen;
+    imagen = roi.clone();
+    
+    std::string ruta = std::string("./NormalizadasReducidasSinEjes/") + nombreImagen;
     // cv::imwrite(ruta, imagen);
     cv::imwrite(ruta, roi);
 }

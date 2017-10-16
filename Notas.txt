@@ -13,6 +13,9 @@ Imágenes en donde no se detectó el contorno del espermatozoide:
 67
 99
 
+Imágenes en donde no funcionó correctamente la normalización de pose:
+
+
 Para extraer la región de la cabeza, necesito sacar el contorno con segunda mayor área, pero que esta área sea mayor que un valor determinado y que cumpla la forma ovalada.
 
 Imágenes en las que falla la normalización de pose:
@@ -20,4 +23,22 @@ Si el eigenvector blanco está hacia abajo (posibles opciones):
 - reflejar la imagen con respecto al eigenvector negro.
 - rotar la imagen 180 grados <--- esta es la idea
  * Esto funciona con todas las imágenes, excepto con la #100.
+
+Casos:
+*Con la imagen original 
+
+
+1. Eje X a la derecha y eje Y hacia arriba: es correcto en la mayoría de casos. Es incorrecto en la imagen 100.
+2. Eje X a la derecha y eje Y hacia abajo: es corregible rotando 180° en la mayoría de casos.
+3. Eje 
+
  
+Parametrización del algoritmo. Necesito:
+- Número de imágenes a procesar (por defecto lee todas las que están dentro de la carpeta Imagenes).
+* Número de imágenes a usar para la reconstrucción (debe ser menor o igual al número de imágenes no descartadas).
+- (opcional) nivel de aumento de resolución de las imágenes. NOTA: cambiar esto también requeriría un cambio del área threshold a usar.
+- (opcional) parámetros del MeanShift
+- (opcional) parámetros del SimpleBlobDetector
+- Nombre de la carpeta en donde se guardan las imágenes normalizadas.
+* step usado para el space carving
+* nombre de la malla de salida
